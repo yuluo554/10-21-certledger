@@ -1,0 +1,87 @@
+# ---- Python 标准模板 ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 测试与覆盖率
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# 虚拟环境（通配覆盖 .venv / .venv-clean / venv-312 等各种命名）
+.venv*/
+venv*/
+env/
+ENV/
+
+# 本地环境与密钥
+.env
+.env.*
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
+tmp/
+
+# ---- 本项目专属：真实证书与私钥永不入库 ----
+# 注意：这些规则同时挡住 fixtures/gen.sh 的产物目录（fixtures/out/），
+# 样本一律现场生成，仓库内不提交任何证书/私钥/容器二进制。
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.jceks
+*.bks
+*.der
+*.crt
+*.cer
+*.csr
+*.crl
+*.p7b
+*.p7c
+*.sst
+*.p8
+*.srl
+*.old
+*.attr
+private/
+_secrets/
+fixtures/out/
+
+# 例外：只允许文档与脚本存在（无二进制证书例外——本仓库不提交任何证书字节）
+!fixtures/gen.sh
