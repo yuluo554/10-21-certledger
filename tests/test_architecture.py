@@ -134,13 +134,16 @@ def test_installed_metadata_matches_module() -> None:
 
 
 def test_shells_raise_instead_of_returning_empty() -> None:
-    """An empty result is a confident wrong answer (plan/06 R8)."""
-    from certledger import collectors, containers, hygiene, inventory, render
+    """An empty result is a confident wrong answer (plan/06 R8).
 
-    with pytest.raises(NotImplementedError):
-        collectors.collect(
-            roots=[], files=[], source="none", follow_symlinks=False, max_size=None, policy=None
-        )
+    ``collectors.collect`` is no longer a shell — it returns a counted structure,
+    including for an empty tree — so it moved out of this assertion and into
+    :func:`test_collector_returns_counts_instead_of_raising`. Keeping the
+    positive half as a test means "returns counts" is a claim something checks,
+    not merely a claim the shell test stopped making.
+    """
+    from certledger import containers, hygiene, inventory, render
+
     with pytest.raises(NotImplementedError):
         inventory.build(roots=[], files=[], source="none", follow_symlinks=False, policy=None)
     with pytest.raises(NotImplementedError):
@@ -164,6 +167,72 @@ def test_shells_raise_instead_of_returning_empty() -> None:
             redact=True,
             source="none",
         )
+
+
+def test_collector_returns_counts_instead_of_raising(tmp_path) -> None:
+    """The positive half of the shell rule, for the module that has landed."""
+    from certledger.collectors import collect
+    from certledger.policy.loader import load_policy
+
+    payload = collect(
+        roots=[str(tmp_path)],
+        files=[],
+        source="none",
+        follow_symlinks=False,
+        max_size=None,
+        policy=load_policy(),
+    )
+    assert payload["kind"] == "collect"
+    assert payload["candidates"] == []
+    summary = payload["summary"]
+    for counter in ("visited", "scanned", "skipped", "directories"):
+        assert counter in summary, counter
+    assert summary["visited"] == summary["scanned"] + summary["skipped"]
+
+
+def test_collectors_import_no_network_modules() -> None:
+    """Module-scoped version of the global gate, pinned to the collector (R9).
+
+    The global check would still pass if the collector grew a helper in another
+    package that imported ``socket``. This one asserts the property where it
+    matters most: the module that touches the filesystem and subprocesses is
+    also the one most likely to grow a "fetch the CRL" shortcut.
+    """
+    collectors = SRC / "collectors"
+    files = sorted(collectors.rglob("*.py"))
+    assert files, "collectors 目录里没有模块——判据是空的"
+    forbidden = (
+        "socket", "ssl", "http", "urllib", "requests", "httpx", "aiohttp",
+        "ftplib", "smtplib", "telnetlib", "xmlrpc", "asyncio",
+    )
+    offenders: list[str] = []
+    for path in files:
+        for name in imports_of(path):
+            if name.split(".")[0] in forbidden:
+                offenders.append(f"{path.name}: {name}")
+    assert offenders == [], offenders
+
+
+def test_only_parsing_computes_hashes() -> None:
+    """K1: one hashing entry point for **key material**. A second one drifts.
+
+    ``policy/loader.py`` is exempt and named explicitly rather than by a loose
+    pattern: it hashes the policy *document* (``policy_sha256``, so a report can
+    say which rules produced it), which is a different object from a
+    certificate. Anything else importing ``hashlib`` is a second fingerprint
+    path and fails here.
+    """
+    allowed = {
+        SRC / "parsing" / "fingerprint.py",
+        SRC / "policy" / "loader.py",
+    }
+    offenders: list[str] = []
+    for path in module_files():
+        if path in allowed:
+            continue
+        if "hashlib" in path.read_text(encoding="utf-8"):
+            offenders.append(str(path.relative_to(SRC.parent.parent)))
+    assert offenders == [], offenders
 
 
 def test_cli_help_has_no_internal_milestone_references() -> None:

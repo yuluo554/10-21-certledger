@@ -6,6 +6,7 @@ analysis produces anything — the modules are shells on purpose (plan/03 §M0).
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 
@@ -92,7 +93,8 @@ def test_naive_as_of_is_rejected() -> None:
 
 
 def test_unimplemented_module_exits_two_without_claiming_success() -> None:
-    code, out, err = run_cli("collect", "--roots", ".")
+    """``inventory`` is still a shell: it must not fabricate an empty ledger."""
+    code, out, err = run_cli("inventory", "--roots", ".")
     assert code == EXIT_USAGE
     assert out == ""  # no fabricated empty result on stdout
     assert "尚未" in err
@@ -100,9 +102,31 @@ def test_unimplemented_module_exits_two_without_claiming_success() -> None:
 
 def test_unimplemented_message_cites_no_internal_milestone() -> None:
     """User-facing text must not reference internal plan numbers (plan/06 R7)."""
-    code, _, err = run_cli("collect", "--roots", ".")
+    code, _, err = run_cli("inventory", "--roots", ".")
     assert code == EXIT_USAGE
     assert "M1" not in err and "M2" not in err and "M3" not in err
+
+
+def test_collect_runs_and_reports_counts(tmp_path) -> None:
+    """``collect`` has landed: it answers with counts, exit code 0."""
+    (tmp_path / "notes.txt").write_text("not a certificate\n", encoding="utf-8")
+    code, out, err = run_cli("collect", "--roots", str(tmp_path), "--source", "none")
+    assert code == 0, err
+    payload = json.loads(out)
+    assert payload["kind"] == "collect"
+    assert payload["summary"]["visited"] == 1
+    assert payload["summary"]["scanned"] == 1
+
+
+def test_collect_writes_json_to_a_file(tmp_path) -> None:
+    target = tmp_path / "out.json"
+    code, out, err = run_cli(
+        "collect", "--roots", str(tmp_path), "--source", "none", "--json", str(target)
+    )
+    assert code == 0, err
+    assert target.is_file()
+    assert json.loads(target.read_text(encoding="utf-8"))["kind"] == "collect"
+    assert "wrote" in out
 
 
 @pytest.mark.parametrize("command", ["hygiene", "report"])

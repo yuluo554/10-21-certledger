@@ -59,6 +59,24 @@ def _add_common_inputs(parser: argparse.ArgumentParser) -> None:
         default=None,
         help="policy file with thresholds and citations (default: bundled)",
     )
+    _add_json_option(parser)
+
+
+def _add_json_option(parser: argparse.ArgumentParser) -> None:
+    """``--json``, accepted **after** the subcommand as well as before it.
+
+    The documented forms put it after (``certledger report --as-of … --json …``,
+    plan/03 §④), but the global position also has to keep working. Hence
+    ``SUPPRESS``: without it, the subparser's own ``None`` default would
+    overwrite a value already parsed at the top level — the classic argparse
+    subparser-default trap.
+    """
+    parser.add_argument(
+        "--json",
+        metavar="PATH",
+        default=argparse.SUPPRESS,
+        help="write machine-readable output to PATH ('-' for stdout)",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -78,12 +96,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="version",
         version=f"{PROG} {__version__}",
     )
-    parser.add_argument(
-        "--json",
-        metavar="PATH",
-        default=None,
-        help="write machine-readable output to PATH ('-' for stdout)",
-    )
+    _add_json_option(parser)
 
     subparsers = parser.add_subparsers(dest="command", metavar="<command>")
 
@@ -303,6 +316,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if getattr(args, "handler", None) is None:
         parser.print_help(sys.stderr)
         return EXIT_USAGE
+
+    # ``--json`` uses SUPPRESS so a subparser's own default cannot clobber a
+    # value parsed at the top level. That leaves the attribute absent when the
+    # option was never given; normalise it here so handlers read one shape.
+    if not hasattr(args, "json"):
+        args.json = None
 
     try:
         return args.handler(args)

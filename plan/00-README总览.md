@@ -140,18 +140,19 @@
 | 五子命令参数面完整、退出码 2 语义正确 | `plan/02` §五 | `tests/test_cli.py`（17 例） | ✅ 已实测（M0） |
 | 阈值零代码字面量 + 出处强制 | CA/B TLS BR v2.3.1 §6.1.5；NIST SP 800-131A Rev.2 | `src/certledger/data/default-policy.json` + `tests/test_policy.py` | ✅ 已实测（M0） |
 | `--as-of` 必填且唯一时间源 | RFC 5280 §4.1.2.5；本机 OpenSSL 实测 | `tests/test_timebase.py` + `tests/test_architecture.py::test_single_clock_source` | ✅ 已实测（M0） |
-| 零网络 | — | `tests/test_architecture.py::test_no_network_imports_anywhere` | ✅ 已实测（M0） |
+| 零网络 | — | `tests/test_architecture.py::test_no_network_imports_anywhere` + 采集器模块级断言 `test_collectors_import_no_network_modules`（R9） | ✅ 已实测（M0/M2） |
 | 八类样本可一键重生成 + 真值可独立复算 | `plan/04` §1.1 / §二；OpenSSL 3.5.6 实测 `-not_before`/`-not_after`/`-set_serial` | `fixtures/gen.sh` + `fixtures/gen.py` + `fixtures/expected.json`；`tests/test_fixtures_truth.py`（39 例）；`gen.sh --determinism` 29 个文件字节全等 | ✅ 已实测（M1） |
+| 八类格式嗅探 + 多块 PEM 展开 + 遍历稳定 + 五种 SKIP | `plan/03` §①；RFC 7468；JKS/JCEKS 魔数本机实测（JDK 26） | `parsing/sniff.py` + `collectors/walker.py`；`tests/test_collectors.py`（51 例，含 `bundle` offset 0/1/2 与真值逐条对账）+ `tests/test_parsing.py`（32 例） | ✅ 已实测（M2） |
 | 证书/私钥/容器/系统库同表交叉引用 | 自建实现（无同类先例，见 `plan/01` §1.4） | 设计定稿于 `plan/03` §②；`model.py` 记录结构已落 | ⬜ 待 M3 验证 |
 | 私钥↔证书按 SPKI 配对 | RFC 5280 §4.2.1.2 SKI / SPKI 结构 | 决策 D8 已定口径；`model.py::KeyRecord.paired_cert_fingerprint` 字段已定 | ⬜ 待 M3 验证 |
 | 过期判定确定性（`--as-of`） | OpenSSL 3.5.6 实测 `verify -attime` 正确报 error 10 | `tests/test_timebase.py`（解析与边界）已落；判定本身待 M4 | ⬜ 待 M4 验证（解析已 ✅） |
 | P12 可造可读 | OpenSSL 3.5.6 `pkcs12 -export/-info`（MAC=sha256、PBES2/AES-256-CBC） | 本机实测 | ✅ 已实测 |
 | JKS 构建与解析可行 | JDK 26 `keytool` 可建 JKS；`cacerts` 实测为 PKCS12、150 条 trustedCertEntry | 本机实测（2026-10-20 复测 JDK 26） | ✅ 已实测 |
 | JKS 解析无停更依赖风险 | pyjks 136★，2024-02-19 停更 | 决策 D2：MVP 走 keytool | ⬜ 待 M5 验证 |
-| Windows 后端可读 | `Get-ChildItem Cert:\LocalMachine\Root` = 76 张；CA=5；My=0；`certutil -store Root` 可列 | 本机实测 | ✅ 已实测 |
+| Windows 后端可读 | `certutil -split -store` 汇总 **81** 张：Root=18、AuthRoot=58、CA=5、My=0（`Cert:\LocalMachine\Root` 视图为 76 = Root 18 + AuthRoot 58，二者有 4 张重叠）。**`certutil -store Root` 单读只看到 18 张，比合并视图少 58 张**——只读 Root 会静默漏报 | 本机实测（2026-10-21，M2）；`tests/test_collectors.py::test_windows_root_view_includes_authroot` 钉住 | ✅ 已实测（M2） |
 | Windows 后端不使用 storeutl | `openssl storeutl 'org.openssl.winstore:'` 返回空 | 本机实测（否定结论） | ✅ 已实测 |
-| Linux 后端可读 | `/etc/ssl/certs/ca-certificates.crt` + p11-kit `trust list` | 本机实测（WSL） | ✅ 已实测 |
-| macOS 后端 | `security find-certificate` | **未实测** | ⬜ 待真机验证或降级 |
+| Linux 后端可读 | `/etc/ssl/certs/ca-certificates.crt` + p11-kit `trust list` | 读取与 PEM 拆分路径已用真实 bundle 实测（`test_linux_backend_reads_a_real_pem_bundle`）；**本机无该文件，真实路径未复测** | 🟡 代码路径已验，真实路径待 Linux 机器 |
+| macOS 后端 | `security find-certificate` | **未实测**；代码恒返回 `SOURCE_UNAVAILABLE` + `unverified_backend:true`（D4） | ⬜ 保持降级，待真机验证 |
 | 零依赖解析底座可选 | Node 24 `crypto.X509Certificate` 可取 validFrom/validTo/fingerprint256/modulusLength | 本机实测（取到 rsa 1024）；仅作交叉校验 | ✅ 已实测 |
 | 开源空白（台账位置空着） | 十条检索式 total_count ≤ 3 或 0 | gh api 检索，窗口 2026-10-19T18:35Z–19:05Z | ⬜ 软论据 |
 | ChainWarden 边界（不验签/不查吊销/只量 RSA/不处理 P12·JKS·私钥·系统库） | ChainWarden 77★ README | ✅ 逐句核对；README 首屏已按 D1 写 | ✅ 已核对 |
@@ -164,7 +165,7 @@
 |---|---|---|---|
 | **M0 骨架** | 方法论装订（`AGENTS.md` + 两道门 + `plan/00` 一行）+ `plan/00–06` + 可运行骨架（五子命令参数面 / 策略加载 / 时间基准 / 记录模型）+ CI workflow | 两道门全绿且 14 组变异全红；`pytest` 全绿；`--help` / `--version` 退出 0；非法参数退出 2；未落地能力不伪造空结果 | ✅ 已完成 |
 | **M1 数据先行** | `fixtures/gen.sh` 造八类样本：健康 / 将过期 / 已过期 / 弱密钥 / 弱签名 / 多别名 / truststore 混私钥 / 孤儿私钥；样本真值 | 样本可由脚本一键重生成；日期与序列号钉死（`-not_before` / `-not_after` / `-set_serial`）；`expected.json` 只存输入与期望；**真实证书与私钥零入库** | ✅ 已完成（2026-10-21） |
-| **M2 采集器** | `collectors`：递归遍历 + 内容嗅探（PEM/DER/PKCS#7/PKCS#12/JKS/JCEKS/PKCS#8/OpenSSH 公钥）+ 三平台后端可插拔 + 降级记录 | 八类格式均能识别；后端缺失产 `SOURCE_UNAVAILABLE` 且退出码 0；遍历顺序稳定；跳过的文件带原因码 | ⬜ 未开始 |
+| **M2 采集器** | `collectors`：递归遍历 + 内容嗅探（PEM/DER/PKCS#7/PKCS#12/JKS/JCEKS/PKCS#8/OpenSSH 公钥）+ 三平台后端可插拔 + 降级记录 | 八类格式均能识别；后端缺失产 `SOURCE_UNAVAILABLE` 且退出码 0；遍历顺序稳定；跳过的文件带原因码 | ✅ 已完成（2026-10-21） |
 | **M3 台账** | `inventory`：统一记录模型 + 双指纹 + `sources[]` 合并 + SPKI 配对 | 同证书三处来源合并为一条；同 CN 不同密钥对不被误配；JSON 键序稳定 | ⬜ 未开始 |
 | **M4 卫生规则** | `hygiene`：九类 finding + 策略文件（阈值带出处）+ `--as-of` 必填 | 每条规则有出处的 `rule_source`；无出处阈值不得生效；策略缺失报错退出 2 | ⬜ 未开始 |
 | **M5 报告与容器** | `report`（JSON+Markdown、退出码、`--fail-on`、`--baseline`）+ `containers`（keytool 路线 + 降级） | 两次运行字节级相同；三类 diff 可复现；无 JDK 时容器降级不失败 | ⬜ 未开始 |
