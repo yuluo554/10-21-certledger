@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  layout:
+    name: Methodology gates (layout + desensitization)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Sprint layout gate (methodology binding)
+        run: python tools/check-sprint-layout.py
+      - name: Desensitization gate (no host paths / usernames / local proxy)
+        run: python tools/check-desensitized.py
+      - name: Gate self-test (mutations must turn the gates red)
+        run: python tools/selftest-gates.py
+      - name: Workflow file parses as YAML with the expected job set
+        run: |
+          python - <<'PY'
+          import pathlib, yaml
+          data = yaml.safe_load(pathlib.Path(".github/workflows/ci.yml").read_text(encoding="utf-8"))
+          jobs = data["jobs"]
+          assert "layout" in jobs and "test" in jobs, sorted(jobs)
+          steps = jobs["layout"]["steps"]
+          assert any("check-sprint-layout.py" in (s.get("run") or "") for s in steps)
+          assert any("check-desensitized.py" in (s.get("run") or "") for s in steps)
+          print(f"jobs={sorted(jobs)} layout steps={len(steps)}")
+          PY
+
+  test:
+    name: Tests (py${{ matrix.python }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.10", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+      - name: Version coherence (single source of truth)
+        run: python -c "import certledger, importlib.metadata as m; assert m.version('certledger') == certledger.__version__, (m.version('certledger'), certledger.__version__)"
+      - name: Test
+        run: python -m pytest -q
+      - name: CLI smoke (every delivered command answers)
+        run: |
+          certledger --version
+          certledger --help
+          python -m certledger --version
+
+  no-residue:
+    name: Repository is clean after a test run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+      - name: Run tests then assert nothing was written into the tree
+        run: |
+          python -m pytest -q
+          git status --porcelain
+          test -z "$(git status --porcelain)"

@@ -1,0 +1,21 @@
+# Normalize source line endings so a Windows checkout and an ubuntu runner see
+# the same bytes. Files whose exact bytes are the object under test must opt out
+# with `-text`; none exist yet (fixtures are generated on demand, never committed).
+* text=auto eol=lf
+
+*.sh text eol=lf
+*.py text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+
+# Generated sample material and any real certificate material never enter git;
+# if one is produced locally it must not be normalized either.
+*.pem -text
+*.key -text
+*.crt -text
+*.der -text
+*.p12 -text
+*.pfx -text
+*.jks -text
+*.jceks -text

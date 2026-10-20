@@ -1,0 +1,33 @@
+# Source distribution contents.
+#
+# setuptools only picks up package sources + the files it auto-detects. The
+# review surfaces below (plan/, data/, tools/, fixtures/, CI) are part of what a
+# source package has to carry: they are what makes a downloaded tarball
+# auditable without cloning the repository. Without this file the sdist silently
+# ships code only — and a missing conftest.py means "pytest" cannot even run in
+# the unpacked tree.
+
+include README.md
+include LICENSE
+include AGENTS.md
+include pyproject.toml
+include .gitignore
+
+# Test suite, including the conftest that puts src/ on sys.path.
+recursive-include tests *.py
+
+# Reproducible sample generator (fixtures/out/ is generated on demand and never shipped).
+recursive-include fixtures *.sh *.md
+
+# Evidence ledger and methodology gates.
+recursive-include plan *.md
+recursive-include data *.md
+recursive-include tools *.py
+
+# CI wiring.
+recursive-include .github *.yml
+
+# Never ship generated or private material, even if one appears locally.
+global-exclude *.pem *.key *.crt *.csr *.der *.p12 *.pfx *.jks *.jceks *.bks *.p7b *.crl
+global-exclude __pycache__ *.py[cod]
+prune fixtures/out

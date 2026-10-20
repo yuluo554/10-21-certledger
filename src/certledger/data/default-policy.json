@@ -1,0 +1,52 @@
+{
+  "policy_version": "1.0.0",
+  "note": "Thresholds and their citations. Single definition point; see data/README.md section 5. Code must not hard-code any of these values.",
+  "hygiene": {
+    "expiring": {
+      "warn_days": 30,
+      "level": "WARN",
+      "source": "RFC 5280 4.1.2.5 (Validity); window length is this project's definition, see data/README.md section 5.2"
+    },
+    "cliff": {
+      "window_days": 30,
+      "min_count": 3,
+      "level": "WARN",
+      "source": "本项目定义（data/README.md 5.3）：同窗口内扎堆到期，按唯一 fingerprint_sha256 计数"
+    },
+    "weak_key": {
+      "rsa": {
+        "min_bits": 2048,
+        "level": "WARN",
+        "source": "CA/B Forum TLS BR v2.3.1 6.1.5 Key sizes; NIST SP 800-131A Rev.2"
+      },
+      "ec": {
+        "allowed_curves": ["secp256r1", "secp384r1", "secp521r1"],
+        "level": "WARN",
+        "source": "CA/B Forum TLS BR v2.3.1 6.1.5 Key sizes"
+      }
+    },
+    "weak_sig": {
+      "forbidden_digests": ["sha1", "md5"],
+      "level": "WARN",
+      "source": "NIST SP 800-131A Rev.2 (SHA-1 disallowed for signature generation; verification is legacy use)"
+    },
+    "nist_2031": {
+      "enabled": false,
+      "level": "INFO",
+      "source": "NIST SP 800-57 Part 1 Rev.5 Table 2 / Table 4; SP 800-131A Rev.2 section 1.1"
+    },
+    "permissions": {
+      "max_posix_mode": "640",
+      "level": "WARN",
+      "source": "本项目定义（data/README.md 5.5）：POSIX mode 不得含 o+r 或 g+r"
+    }
+  },
+  "collect": {
+    "max_file_bytes": 8388608,
+    "sniff_bytes": 4096,
+    "follow_symlinks_default": false
+  },
+  "report": {
+    "default_fail_on": "ERROR"
+  }
+}
