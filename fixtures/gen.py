@@ -1247,7 +1247,20 @@ def write_manifest(out_root: Path, built_cases: Sequence[Built]) -> Path:
                 "case": built.spec["case"],
                 "group": built.spec["group"],
                 "purpose": built.spec["purpose"],
-                "files": sorted({artifact["path"] for artifact in built.artifacts}),
+                # data/README §4.1 asks for name / format / expected result /
+                # generation parameters per entry. The command is the one
+                # invocation that regenerates this case alone.
+                "generate": f"bash fixtures/gen.sh --only {built.spec['case']} --out <dir>",
+                "files": [
+                    {
+                        "path": artifact["path"],
+                        "format": artifact["format"],
+                        "kind": artifact["kind"],
+                        "reproducible": artifact["reproducible"],
+                        "sha256": artifact.get("sha256"),
+                    }
+                    for artifact in sorted(built.artifacts, key=lambda item: (item["path"], item.get("offset", 0)))
+                ],
                 "expect": {
                     "findings": [code for code, _severity, _count in built.spec["findings"]],
                     "absent": list(built.spec["absent"]),
@@ -1556,6 +1569,17 @@ def generate_all(
     if not quiet:
         for item in built:
             print(f"  generated  {item.spec['case']:<22} {len(item.artifacts)} 个产物")
+        # plan/04 §三: the generator prints every file's sha256 as it goes, so a
+        # reviewer can compare two runs without a second tool.
+        print("  sha256:")
+        for name in sorted(
+            path.relative_to(out_root).as_posix()
+            for path in out_root.rglob("*")
+            if path.is_file() and path.name != "manifest.json"
+        ):
+            digest = sha256_file(out_root / name)
+            note = "  (容器：字节每次不同，按 alias 表比对)" if name.endswith(".p12") else ""
+            print(f"    {digest}  {name}{note}")
 
     if emit_manifest:
         manifest = write_manifest(out_root, built)

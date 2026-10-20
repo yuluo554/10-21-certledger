@@ -22,7 +22,7 @@ M0、M1 已完成并本地验证。M2 **未开始**。
 | **真值** | `fixtures/expected.json`（17 用例、入仓、无 `observed_*`、无 PEM 材料） |
 | **确定性自检** | `bash fixtures/gen.sh --determinism` → 29 个文件两次生成字节全等 + 3 个容器按 alias 表比对通过 |
 | **比对通路** | `bash fixtures/gen.sh --check` → 17 用例 / 字节级 31 项 / alias 表 3 项 / 容器字节跳过 3 项 |
-| 测试 | `PYTHONDONTWRITEBYTECODE=1 py -3.12 -X utf8 -m pytest -q` → **101 passed, 1 skipped**（skip 是未安装 editable 时的元数据比对）；`tests/test_fixtures_truth.py` 单文件 36 例 |
+| 测试 | `PYTHONDONTWRITEBYTECODE=1 py -3.12 -X utf8 -m pytest -q` → **105 passed**（干净树里会多 1 个 skip：非 git 检出）；`tests/test_fixtures_truth.py` 单文件 39 例 |
 | 隐私红线 | `git status --porcelain` 里没有任何 `*.pem/*.key/*.p12/*.jks/*.der`；`fixtures/out/` 被 `.gitignore` 挡 |
 
 **未发生的事**：CI 从未实跑（无远端）。M0/M1 的 CI 项一律只能记为"本地等价校验，未接远端，CI 待首推验证"。

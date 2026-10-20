@@ -48,7 +48,31 @@ if [ "${OPENSSL_MAJOR}" -lt 3 ]; then
         旧版本只能按当前时刻推算有效期，样本会不可复现）。"
 fi
 
-# ── ② Python ≥ 3.10（项目下界） ─────────────────────────────────────────────
+# ── ② keytool（可选；探到就报告，探不到就明说本次跳过什么） ─────────────────
+# JKS 样本需要 keytool，而 keytool 是可选依赖（plan/00 D2）：没有 JDK 的机器上
+# 容器视图降级，不是项目不可用。因此这里**只探测与告知**，不退出 2。
+# 注意：JDK 的 bin 目录通常不在 PATH 上（本机实测只有 java 的 shim，没有 keytool）。
+find_keytool() {
+    if command -v keytool >/dev/null 2>&1; then
+        printf 'keytool'; return 0
+    fi
+    for candidate in \
+        "${JAVA_HOME:+${JAVA_HOME}/bin/keytool}" \
+        "/c/Program Files/Java/latest/jdk-26/bin/keytool.exe" \
+        /c/Program\ Files/Java/jdk*/bin/keytool.exe
+    do
+        [ -n "${candidate}" ] && [ -x "${candidate}" ] && { printf '%s' "${candidate}"; return 0; }
+    done
+    return 1
+}
+
+if KEYTOOL_PATH="$(find_keytool)"; then
+    printf 'gen.sh: keytool 可用（%s）——本次样本不含 JKS，容器路线见后续里程碑\n' "${KEYTOOL_PATH}" >&2
+else
+    printf 'gen.sh: 未探测到 keytool——本次跳过 JKS/JCEKS 样本（可选依赖，不失败）\n' >&2
+fi
+
+# ── ③ Python ≥ 3.10（项目下界） ─────────────────────────────────────────────
 find_python() {
     for candidate in python3 python py; do
         command -v "${candidate}" >/dev/null 2>&1 || continue

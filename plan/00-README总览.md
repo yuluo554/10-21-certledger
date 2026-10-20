@@ -141,7 +141,7 @@
 | 阈值零代码字面量 + 出处强制 | CA/B TLS BR v2.3.1 §6.1.5；NIST SP 800-131A Rev.2 | `src/certledger/data/default-policy.json` + `tests/test_policy.py` | ✅ 已实测（M0） |
 | `--as-of` 必填且唯一时间源 | RFC 5280 §4.1.2.5；本机 OpenSSL 实测 | `tests/test_timebase.py` + `tests/test_architecture.py::test_single_clock_source` | ✅ 已实测（M0） |
 | 零网络 | — | `tests/test_architecture.py::test_no_network_imports_anywhere` | ✅ 已实测（M0） |
-| 八类样本可一键重生成 + 真值可独立复算 | `plan/04` §1.1 / §二；OpenSSL 3.5.6 实测 `-not_before`/`-not_after`/`-set_serial` | `fixtures/gen.sh` + `fixtures/gen.py` + `fixtures/expected.json`；`tests/test_fixtures_truth.py`（36 例）；`gen.sh --determinism` 29 个文件字节全等 | ✅ 已实测（M1） |
+| 八类样本可一键重生成 + 真值可独立复算 | `plan/04` §1.1 / §二；OpenSSL 3.5.6 实测 `-not_before`/`-not_after`/`-set_serial` | `fixtures/gen.sh` + `fixtures/gen.py` + `fixtures/expected.json`；`tests/test_fixtures_truth.py`（39 例）；`gen.sh --determinism` 29 个文件字节全等 | ✅ 已实测（M1） |
 | 证书/私钥/容器/系统库同表交叉引用 | 自建实现（无同类先例，见 `plan/01` §1.4） | 设计定稿于 `plan/03` §②；`model.py` 记录结构已落 | ⬜ 待 M3 验证 |
 | 私钥↔证书按 SPKI 配对 | RFC 5280 §4.2.1.2 SKI / SPKI 结构 | 决策 D8 已定口径；`model.py::KeyRecord.paired_cert_fingerprint` 字段已定 | ⬜ 待 M3 验证 |
 | 过期判定确定性（`--as-of`） | OpenSSL 3.5.6 实测 `verify -attime` 正确报 error 10 | `tests/test_timebase.py`（解析与边界）已落；判定本身待 M4 | ⬜ 待 M4 验证（解析已 ✅） |

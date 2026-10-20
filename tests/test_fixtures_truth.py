@@ -625,6 +625,45 @@ def test_unknown_case_name_is_a_usage_error(tmp_path) -> None:
     assert "no-such-case" in result.stderr
 
 
+def test_generator_probes_the_optional_keytool(tmp_path) -> None:
+    """``keytool`` is optional (D2): probe and say so, never fail the run.
+
+    JDK's bin directory is usually not on PATH — on this machine ``java`` has a
+    shim but ``keytool`` does not — so the probe has to look in the JDK tree
+    rather than trusting ``command -v`` alone.
+    """
+    result = subprocess.run(
+        ["bash", str(GEN_SH), "--only", "healthy", "--out", str(tmp_path / "out")],
+        capture_output=True,
+        text=True,
+        cwd=str(ROOT),
+        timeout=600,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "keytool" in result.stderr, "生成器必须报告 keytool 探测结果（可用或跳过）"
+    assert "跳过" in result.stderr or "可用" in result.stderr
+
+
+@_HAVE_ARTIFACTS
+def test_manifest_records_format_and_command_per_file() -> None:
+    """``data/README`` §4.1: name / format / expected result / generation command."""
+    manifest_path = OUT_DIR / "manifest.json"
+    if not manifest_path.is_file():
+        pytest.skip("manifest.json 只在生成时写出")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["cases"]
+    for entry in manifest["cases"]:
+        assert entry["generate"].startswith("bash fixtures/gen.sh --only "), entry["case"]
+        assert entry["case"] in entry["generate"]
+        assert entry["files"], entry["case"]
+        for item in entry["files"]:
+            assert item["path"] and item["format"] and item["kind"], (entry["case"], item)
+            assert item["reproducible"] in {"bytes", "alias_table"}
+            # A container has no stable digest; everything else must have one.
+            if item["reproducible"] == "bytes":
+                assert item["sha256"] and len(item["sha256"]) == 64, (entry["case"], item)
+
+
 @_HAVE_ARTIFACTS
 def test_check_path_reports_what_it_skipped() -> None:
     """``--check`` must print the container skip count, not hide it."""
