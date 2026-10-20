@@ -1,0 +1,1234 @@
+{
+  "schema_version": 1,
+  "kind": "fixture-truth",
+  "note": "输入 + 期望，不含任何观测值（没有 observed_*/actual_* 字段）。每条期望都能只凭本文件的 artifacts 独立复算，不需要 import 规则引擎。",
+  "as_of": 1900000000,
+  "as_of_utc": "2030-03-17T17:46:40Z",
+  "generator": {
+    "entry": "fixtures/gen.sh",
+    "engine": "fixtures/gen.py",
+    "openssl_min_major": 3,
+    "container_password": "changeit（公开夹具口令；空口令用例除外）",
+    "policy": "src/certledger/data/default-policy.json"
+  },
+  "policy_numbers_used": {
+    "warn_days": 30,
+    "cliff_window_days": 30,
+    "cliff_min_count": 3,
+    "weak_key_rsa_min_bits": 2048
+  },
+  "cases": [
+    {
+      "case": "healthy",
+      "group": "required",
+      "purpose": "健康：有效期与强度都在界内，私钥与证书配对",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "healthy/healthy.pem",
+        "healthy/healthy.key"
+      ],
+      "artifacts": [
+        {
+          "path": "healthy/healthy.pem",
+          "kind": "cert",
+          "format": "pem",
+          "reproducible": "bytes",
+          "subject": "CN=healthy.example",
+          "issuer": "CN=healthy.example",
+          "serial": "0x1001",
+          "not_before": "2029-03-17T17:46:40Z",
+          "not_after": "2031-03-17T17:46:40Z",
+          "fingerprint_sha256": "3e4ca9a8b28239668f42a0e00b3a4f4822405f86cd8c15efaad85630a5116c3d",
+          "spki_sha256": "e208e19fd6e8e7ce4fcff81bb5e5296a12d07444fd3830d90692a2e041370744",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "sig_algo": "1.2.840.113549.1.1.11",
+          "sig_algo_name": "sha256WithRSAEncryption",
+          "san_dns": [
+            "healthy.example"
+          ],
+          "is_ca": false,
+          "sha256": "49a805668415c89f690281be5cf00b03c6ebb050dbeed41b0c91de4229439936"
+        },
+        {
+          "path": "healthy/healthy.key",
+          "kind": "key",
+          "format": "pem",
+          "reproducible": "bytes",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "encrypted": false,
+          "spki_sha256": "e208e19fd6e8e7ce4fcff81bb5e5296a12d07444fd3830d90692a2e041370744",
+          "sha256": "b82a5e480ad9c4901b3d69321422d56eb812ecb41778842a169abc63f39bc975"
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "PRIVATE_KEY_UNENCRYPTED",
+            "severity": "WARN",
+            "count": 1
+          }
+        ],
+        "absent": [
+          "DUPLICATE_CERT",
+          "DUPLICATE_KEY",
+          "EXPIRED",
+          "EXPIRING",
+          "EXPIRY_CLIFF",
+          "ORPHAN_CERT",
+          "ORPHAN_KEY",
+          "WEAK_KEY",
+          "WEAK_SIG"
+        ]
+      },
+      "index": 1
+    },
+    {
+      "case": "expiring",
+      "group": "required",
+      "purpose": "将过期：not_after 落在 [as_of, as_of+30d)",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "expiring/expiring.pem",
+        "expiring/expiring.key"
+      ],
+      "artifacts": [
+        {
+          "path": "expiring/expiring.pem",
+          "kind": "cert",
+          "format": "pem",
+          "reproducible": "bytes",
+          "subject": "CN=expiring.example",
+          "issuer": "CN=expiring.example",
+          "serial": "0x1002",
+          "not_before": "2029-03-17T17:46:40Z",
+          "not_after": "2030-03-27T17:46:40Z",
+          "fingerprint_sha256": "0358b114b0ca434748e676290c37d77d3fb61bbd487a85593a5250381adc2dce",
+          "spki_sha256": "1d2b39e78d1737ff151f1aeece2c1c2d7bd4903ce9bde80f2817d625abe933ac",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "sig_algo": "1.2.840.113549.1.1.11",
+          "sig_algo_name": "sha256WithRSAEncryption",
+          "san_dns": [
+            "expiring.example"
+          ],
+          "is_ca": false,
+          "sha256": "79875d115041e97e10d29ebbdc78e19c2bf88b70d80dfcffd93fa187820c3baa"
+        },
+        {
+          "path": "expiring/expiring.key",
+          "kind": "key",
+          "format": "pem",
+          "reproducible": "bytes",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "encrypted": false,
+          "spki_sha256": "1d2b39e78d1737ff151f1aeece2c1c2d7bd4903ce9bde80f2817d625abe933ac",
+          "sha256": "1f9b4d47a0eac74bcba3fe5c998221c7e06abde1bd65fa4dc9f8e8828708862b"
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "EXPIRING",
+            "severity": "WARN",
+            "count": 1
+          },
+          {
+            "code": "PRIVATE_KEY_UNENCRYPTED",
+            "severity": "WARN",
+            "count": 1
+          }
+        ],
+        "absent": [
+          "DUPLICATE_CERT",
+          "EXPIRED",
+          "EXPIRY_CLIFF",
+          "ORPHAN_CERT",
+          "ORPHAN_KEY",
+          "WEAK_KEY",
+          "WEAK_SIG"
+        ]
+      },
+      "index": 2
+    },
+    {
+      "case": "expired",
+      "group": "required",
+      "purpose": "已过期：not_after 严格早于 as_of",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "expired/expired.pem",
+        "expired/expired.key"
+      ],
+      "artifacts": [
+        {
+          "path": "expired/expired.pem",
+          "kind": "cert",
+          "format": "pem",
+          "reproducible": "bytes",
+          "subject": "CN=expired.example",
+          "issuer": "CN=expired.example",
+          "serial": "0x1003",
+          "not_before": "2029-02-10T17:46:40Z",
+          "not_after": "2030-03-12T17:46:40Z",
+          "fingerprint_sha256": "109eeed2f5db56e66cefefcae9fd383c6b50079d9b8caeb0030c9a4e75943366",
+          "spki_sha256": "fec392f1c031d8779bb0a6002627653630ef8d0cc9141d976826a4a24683bb29",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "sig_algo": "1.2.840.113549.1.1.11",
+          "sig_algo_name": "sha256WithRSAEncryption",
+          "san_dns": [
+            "expired.example"
+          ],
+          "is_ca": false,
+          "sha256": "2d7a01a6b7870f8b0b2393f14d4b99ce42f14c83941128db96759294e8b3dc8e"
+        },
+        {
+          "path": "expired/expired.key",
+          "kind": "key",
+          "format": "pem",
+          "reproducible": "bytes",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "encrypted": false,
+          "spki_sha256": "fec392f1c031d8779bb0a6002627653630ef8d0cc9141d976826a4a24683bb29",
+          "sha256": "d5540740b943a824070a5d98fec4017dcd56d418795fc5548ec0041310f0c267"
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "EXPIRED",
+            "severity": "ERROR",
+            "count": 1
+          },
+          {
+            "code": "PRIVATE_KEY_UNENCRYPTED",
+            "severity": "WARN",
+            "count": 1
+          }
+        ],
+        "absent": [
+          "DUPLICATE_CERT",
+          "EXPIRING",
+          "ORPHAN_CERT",
+          "ORPHAN_KEY",
+          "WEAK_KEY",
+          "WEAK_SIG"
+        ]
+      },
+      "index": 3
+    },
+    {
+      "case": "weak-key",
+      "group": "required",
+      "purpose": "弱密钥：RSA 1024，低于 CA/B §6.1.5 的 2048",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "weak-key/weak-key.pem",
+        "weak-key/weak-key.key"
+      ],
+      "artifacts": [
+        {
+          "path": "weak-key/weak-key.pem",
+          "kind": "cert",
+          "format": "pem",
+          "reproducible": "bytes",
+          "subject": "CN=weak-key.example",
+          "issuer": "CN=weak-key.example",
+          "serial": "0x1004",
+          "not_before": "2029-03-17T17:46:40Z",
+          "not_after": "2031-03-17T17:46:40Z",
+          "fingerprint_sha256": "a57ed32c80fd286dc5565a28b32795edc5c336d472b5d4f5b927a96051829c7c",
+          "spki_sha256": "4d30e5d0cf0401d561fe437d56abe29ee4082aa96842cd583cd91975e8ecdf66",
+          "key_algo": "rsa",
+          "key_bits": 1024,
+          "key_curve": null,
+          "sig_algo": "1.2.840.113549.1.1.11",
+          "sig_algo_name": "sha256WithRSAEncryption",
+          "san_dns": [
+            "weak-key.example"
+          ],
+          "is_ca": false,
+          "sha256": "b23410a9984cce9f8b17b911fe247c7462c076653bb8e1e7f28ee57d3d9edbab"
+        },
+        {
+          "path": "weak-key/weak-key.key",
+          "kind": "key",
+          "format": "pem",
+          "reproducible": "bytes",
+          "key_algo": "rsa",
+          "key_bits": 1024,
+          "key_curve": null,
+          "encrypted": false,
+          "spki_sha256": "4d30e5d0cf0401d561fe437d56abe29ee4082aa96842cd583cd91975e8ecdf66",
+          "sha256": "22e3f7a77ba3b8170fb87731e862aa980fcad5dc6bf34d8616e242cc90ef3cae"
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "PRIVATE_KEY_UNENCRYPTED",
+            "severity": "WARN",
+            "count": 1
+          },
+          {
+            "code": "WEAK_KEY",
+            "severity": "WARN",
+            "count": 1
+          }
+        ],
+        "absent": [
+          "DUPLICATE_CERT",
+          "EXPIRED",
+          "EXPIRING",
+          "ORPHAN_CERT",
+          "ORPHAN_KEY",
+          "WEAK_SIG"
+        ]
+      },
+      "index": 4
+    },
+    {
+      "case": "weak-sig",
+      "group": "required",
+      "purpose": "弱签名：SHA-1 签发（NIST SP 800-131A Rev.2：签名生成不再允许）",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "weak-sig/weak-sig.pem",
+        "weak-sig/weak-sig.key"
+      ],
+      "artifacts": [
+        {
+          "path": "weak-sig/weak-sig.pem",
+          "kind": "cert",
+          "format": "pem",
+          "reproducible": "bytes",
+          "subject": "CN=weak-sig.example",
+          "issuer": "CN=weak-sig.example",
+          "serial": "0x1005",
+          "not_before": "2029-03-17T17:46:40Z",
+          "not_after": "2031-03-17T17:46:40Z",
+          "fingerprint_sha256": "a08f5143ab05c7da2b47c7cf33c7b8446bb23e3a5c647975401f5210a969b3d3",
+          "spki_sha256": "c2190a6f3a9b5b37ebd244c65d00d177bb9041993bac3f4d087f2f0ae053f71f",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "sig_algo": "1.2.840.113549.1.1.5",
+          "sig_algo_name": "sha1WithRSAEncryption",
+          "san_dns": [
+            "weak-sig.example"
+          ],
+          "is_ca": false,
+          "sha256": "c0615b3164270be11de1b375bb78ec03cdd3fe122352c8c8af4f3e5161829afa"
+        },
+        {
+          "path": "weak-sig/weak-sig.key",
+          "kind": "key",
+          "format": "pem",
+          "reproducible": "bytes",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "encrypted": false,
+          "spki_sha256": "c2190a6f3a9b5b37ebd244c65d00d177bb9041993bac3f4d087f2f0ae053f71f",
+          "sha256": "d2cf7ac3aed726d92390b3eccd76638f7716aaaabead04a0babd92511e0f1839"
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "PRIVATE_KEY_UNENCRYPTED",
+            "severity": "WARN",
+            "count": 1
+          },
+          {
+            "code": "WEAK_SIG",
+            "severity": "WARN",
+            "count": 1
+          }
+        ],
+        "absent": [
+          "DUPLICATE_CERT",
+          "EXPIRED",
+          "EXPIRING",
+          "ORPHAN_CERT",
+          "ORPHAN_KEY",
+          "WEAK_KEY"
+        ]
+      },
+      "index": 5
+    },
+    {
+      "case": "multi-alias",
+      "group": "required",
+      "purpose": "多别名：同一证书在一个容器里挂两个 alias → 2 条来源、DUPLICATE_CERT",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "multi-alias/multi-alias.p12"
+      ],
+      "artifacts": [
+        {
+          "path": "multi-alias/multi-alias.p12",
+          "kind": "container",
+          "format": "pkcs12",
+          "reproducible": "alias_table",
+          "entry_count": 2
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "DUPLICATE_CERT",
+            "severity": "INFO",
+            "count": 1
+          },
+          {
+            "code": "ORPHAN_CERT",
+            "severity": "INFO",
+            "count": 1
+          }
+        ],
+        "absent": [
+          "CONTAINER_EMPTY_PASSWORD",
+          "CONTAINER_TRUSTSTORE_WITH_KEY",
+          "EXPIRED",
+          "EXPIRING",
+          "ORPHAN_KEY",
+          "WEAK_KEY",
+          "WEAK_SIG"
+        ],
+        "container": {
+          "format": "pkcs12",
+          "password": "set",
+          "has_private_key": false,
+          "entries": [
+            {
+              "alias": "multi-alias-primary",
+              "entry_type": "trustedCert",
+              "fingerprint_sha256": "b3270acaf164ce29d17f8462511ae5a4482002950234f3732ad2b873b2e38229",
+              "spki_sha256": "f45033653645c52cf7451279fcddbaddc5c8f944ef7cd62ab0008b112f9a1687"
+            },
+            {
+              "alias": "multi-alias-secondary",
+              "entry_type": "trustedCert",
+              "fingerprint_sha256": "b3270acaf164ce29d17f8462511ae5a4482002950234f3732ad2b873b2e38229",
+              "spki_sha256": "f45033653645c52cf7451279fcddbaddc5c8f944ef7cd62ab0008b112f9a1687"
+            }
+          ]
+        }
+      },
+      "index": 6
+    },
+    {
+      "case": "truststore-with-key",
+      "group": "required",
+      "purpose": "truststore 混私钥：一个私钥条目 + 一个外来可信证书（两把不同的公钥）",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "truststore-with-key/mixed.p12"
+      ],
+      "artifacts": [
+        {
+          "path": "truststore-with-key/mixed.p12",
+          "kind": "container",
+          "format": "pkcs12",
+          "reproducible": "alias_table",
+          "entry_count": 2
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "ORPHAN_CERT",
+            "severity": "INFO",
+            "count": 1
+          },
+          {
+            "code": "CONTAINER_TRUSTSTORE_WITH_KEY",
+            "severity": "WARN",
+            "count": 1
+          }
+        ],
+        "absent": [
+          "CONTAINER_EMPTY_PASSWORD",
+          "DUPLICATE_CERT",
+          "EXPIRED",
+          "EXPIRING",
+          "ORPHAN_KEY",
+          "WEAK_KEY",
+          "WEAK_SIG"
+        ],
+        "container": {
+          "format": "pkcs12",
+          "password": "set",
+          "has_private_key": true,
+          "entries": [
+            {
+              "alias": "key-entry",
+              "entry_type": "privateKey",
+              "fingerprint_sha256": "0bbb9f8ddbf74b3c8c875f06842d6f0c9c47268f2f0441c67d5bd171de0f8d2c",
+              "spki_sha256": "af8a7f4b427d56f6335113a18247461c97423543aebf2147d835aff303abd717"
+            },
+            {
+              "alias": "trusted-only",
+              "entry_type": "trustedCert",
+              "fingerprint_sha256": "9e67144a54951f6db0596cfd3eaf5f518fc999f8494c4bf656dee5511b003797",
+              "spki_sha256": "e0a29c748be05320a719b41d00a273de8f44687d91dd24c7f2c1b23db87bacff"
+            }
+          ]
+        }
+      },
+      "index": 7
+    },
+    {
+      "case": "orphan",
+      "group": "required",
+      "purpose": "孤儿：私钥与证书来自两个不同密钥对，谁也不配谁",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "orphan/orphan.key",
+        "orphan/orphan.crt"
+      ],
+      "artifacts": [
+        {
+          "path": "orphan/orphan.key",
+          "kind": "key",
+          "format": "pem",
+          "reproducible": "bytes",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "encrypted": false,
+          "spki_sha256": "95992b5d5c2e0233b7bd10df67b3bd3cd56bf5b6308ecb13f39815f0fd499618",
+          "sha256": "ca75b5df7d1879b1da4895a1a7f89fb1554105c30f61c78cfd1bcfa90ba6e1db"
+        },
+        {
+          "path": "orphan/orphan.crt",
+          "kind": "cert",
+          "format": "pem",
+          "reproducible": "bytes",
+          "subject": "CN=orphan-cert.example",
+          "issuer": "CN=orphan-cert.example",
+          "serial": "0x1009",
+          "not_before": "2029-03-17T17:46:40Z",
+          "not_after": "2031-03-17T17:46:40Z",
+          "fingerprint_sha256": "bbcfa8abdd48f900bbf47292a309e86b32cafb0f5e5fd50f31511dc9290b944f",
+          "spki_sha256": "e7c0223ea675b96d06c7d415424adcf87e7ccb4a9c77e5d18ab25153bd974492",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "sig_algo": "1.2.840.113549.1.1.11",
+          "sig_algo_name": "sha256WithRSAEncryption",
+          "san_dns": [
+            "orphan-cert.example"
+          ],
+          "is_ca": false,
+          "sha256": "bb9ba6b9fec1593ac7ae4068721a6b0d4ddab5c520dcdf582592a08b8a124f92"
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "ORPHAN_CERT",
+            "severity": "INFO",
+            "count": 1
+          },
+          {
+            "code": "ORPHAN_KEY",
+            "severity": "INFO",
+            "count": 1
+          },
+          {
+            "code": "PRIVATE_KEY_UNENCRYPTED",
+            "severity": "WARN",
+            "count": 1
+          }
+        ],
+        "absent": [
+          "DUPLICATE_CERT",
+          "EXPIRED",
+          "EXPIRING",
+          "WEAK_KEY",
+          "WEAK_SIG"
+        ]
+      },
+      "index": 8
+    },
+    {
+      "case": "pair",
+      "group": "supplementary",
+      "purpose": "配对正确：同一密钥对的 cert.pem + key.pem 互相配对，不产 ORPHAN_*",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "pair/cert.pem",
+        "pair/key.pem"
+      ],
+      "artifacts": [
+        {
+          "path": "pair/cert.pem",
+          "kind": "cert",
+          "format": "pem",
+          "reproducible": "bytes",
+          "subject": "CN=pair.example",
+          "issuer": "CN=pair.example",
+          "serial": "0x2001",
+          "not_before": "2029-03-17T17:46:40Z",
+          "not_after": "2031-03-17T17:46:40Z",
+          "fingerprint_sha256": "ba48ffec7b9f27e07c03b47469b0a1bdba4013754a979d2841d5583b8bc386f4",
+          "spki_sha256": "9b6434e246152ae7a507794fd277416712e3c209ca0017015ec2b5192ae9aa2c",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "sig_algo": "1.2.840.113549.1.1.11",
+          "sig_algo_name": "sha256WithRSAEncryption",
+          "san_dns": [
+            "pair.example"
+          ],
+          "is_ca": false,
+          "sha256": "9ac8c7338b934c05a6c19e50ca55dca59e5d739132a0575f64eac59f370e94f7"
+        },
+        {
+          "path": "pair/key.pem",
+          "kind": "key",
+          "format": "pem",
+          "reproducible": "bytes",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "encrypted": false,
+          "spki_sha256": "9b6434e246152ae7a507794fd277416712e3c209ca0017015ec2b5192ae9aa2c",
+          "sha256": "82bf0ab774d5e5e820759d0a98f216830d5ea80b16af591076823e85b66f4e77"
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "PRIVATE_KEY_UNENCRYPTED",
+            "severity": "WARN",
+            "count": 1
+          }
+        ],
+        "absent": [
+          "EXPIRED",
+          "EXPIRING",
+          "ORPHAN_CERT",
+          "ORPHAN_KEY",
+          "WEAK_KEY",
+          "WEAK_SIG"
+        ]
+      }
+    },
+    {
+      "case": "same-cn",
+      "group": "supplementary",
+      "purpose": "不误配：同 CN 的两个不同密钥对，证书与私钥互不配对（按 SPKI，不按 CN）",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "same-cn/cert.pem",
+        "same-cn/key.pem"
+      ],
+      "artifacts": [
+        {
+          "path": "same-cn/cert.pem",
+          "kind": "cert",
+          "format": "pem",
+          "reproducible": "bytes",
+          "subject": "CN=shared.example",
+          "issuer": "CN=shared.example",
+          "serial": "0x2002",
+          "not_before": "2029-03-17T17:46:40Z",
+          "not_after": "2031-03-17T17:46:40Z",
+          "fingerprint_sha256": "0a5675b47c76f85f2e116047699b2523c64d6d001981f7db8ed2d0c10504ebf3",
+          "spki_sha256": "d38da5c044d199f02d11cb10e7a88c1e956d9cc6dadaf8920cb8c73fa1373052",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "sig_algo": "1.2.840.113549.1.1.11",
+          "sig_algo_name": "sha256WithRSAEncryption",
+          "san_dns": [
+            "shared.example"
+          ],
+          "is_ca": false,
+          "sha256": "7907b38f27843b005306c35fea73fc4c17879eb16634174feabd86223996f7f9"
+        },
+        {
+          "path": "same-cn/key.pem",
+          "kind": "key",
+          "format": "pem",
+          "reproducible": "bytes",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "encrypted": false,
+          "spki_sha256": "0f3c56e5a101b315becb23dbaa4a67ce3c8f12b02f5df549f072e82aaeb2fdeb",
+          "sha256": "f2e1ebfb770e3cedd366a8b47fc13b39ad72d3aa120700da88a19665509bceb0"
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "ORPHAN_CERT",
+            "severity": "INFO",
+            "count": 1
+          },
+          {
+            "code": "ORPHAN_KEY",
+            "severity": "INFO",
+            "count": 1
+          },
+          {
+            "code": "PRIVATE_KEY_UNENCRYPTED",
+            "severity": "WARN",
+            "count": 1
+          }
+        ],
+        "absent": [
+          "DUPLICATE_CERT",
+          "EXPIRED",
+          "EXPIRING",
+          "WEAK_KEY",
+          "WEAK_SIG"
+        ]
+      }
+    },
+    {
+      "case": "cliff-none",
+      "group": "supplementary",
+      "purpose": "EXPIRY_CLIFF 不触发：窗口内只有 1 张不同证书",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "cliff-none/c1.pem",
+        "cliff-none/c1.key"
+      ],
+      "artifacts": [
+        {
+          "path": "cliff-none/c1.pem",
+          "kind": "cert",
+          "format": "pem",
+          "reproducible": "bytes",
+          "subject": "CN=cliff-none-c1.example",
+          "issuer": "CN=cliff-none-c1.example",
+          "serial": "0x3000",
+          "not_before": "2029-03-17T17:46:40Z",
+          "not_after": "2030-03-27T17:46:40Z",
+          "fingerprint_sha256": "e765079ba8cf731c6bcbf3fb7a58cdc1ce7cb1d65aa3cf59ea9351546417f5e5",
+          "spki_sha256": "c7a893e2bdc81907cf0b8f9ca5111d41ccea18d9daf09fc0fa0946fe6348c854",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "sig_algo": "1.2.840.113549.1.1.11",
+          "sig_algo_name": "sha256WithRSAEncryption",
+          "san_dns": [
+            "cliff-none-c1.example"
+          ],
+          "is_ca": false,
+          "sha256": "0343444104aa73acd6840a4bb872f68f991db6e76955e398ff86eda74e2a72a8"
+        },
+        {
+          "path": "cliff-none/c1.key",
+          "kind": "key",
+          "format": "pem",
+          "reproducible": "bytes",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "encrypted": false,
+          "spki_sha256": "c7a893e2bdc81907cf0b8f9ca5111d41ccea18d9daf09fc0fa0946fe6348c854",
+          "sha256": "d96fa01199839f1023169bfba4bc803018e05070abd8e5753f7b7bf5cf24d9b8"
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "EXPIRING",
+            "severity": "WARN",
+            "count": 1
+          },
+          {
+            "code": "PRIVATE_KEY_UNENCRYPTED",
+            "severity": "WARN",
+            "count": 1
+          }
+        ],
+        "absent": [
+          "EXPIRED",
+          "EXPIRY_CLIFF",
+          "ORPHAN_CERT",
+          "ORPHAN_KEY",
+          "WEAK_KEY",
+          "WEAK_SIG"
+        ]
+      }
+    },
+    {
+      "case": "cliff-hit",
+      "group": "supplementary",
+      "purpose": "EXPIRY_CLIFF 触发：窗口内 3 张不同证书扎堆到期（按去重指纹计数）",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "cliff-hit/c1.pem",
+        "cliff-hit/c1.key",
+        "cliff-hit/c2.pem",
+        "cliff-hit/c2.key",
+        "cliff-hit/c3.pem",
+        "cliff-hit/c3.key"
+      ],
+      "artifacts": [
+        {
+          "path": "cliff-hit/c1.pem",
+          "kind": "cert",
+          "format": "pem",
+          "reproducible": "bytes",
+          "subject": "CN=cliff-hit-c1.example",
+          "issuer": "CN=cliff-hit-c1.example",
+          "serial": "0x3100",
+          "not_before": "2029-03-17T17:46:40Z",
+          "not_after": "2030-03-27T17:46:40Z",
+          "fingerprint_sha256": "d092c606ee331cae6091e5ae7e0c37cdfb3c431bca08f324dbc195e9a1b795a5",
+          "spki_sha256": "8fdfb1691e7148d405fb43c6213504bb327414aad6dc67fb83c67e353789dd03",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "sig_algo": "1.2.840.113549.1.1.11",
+          "sig_algo_name": "sha256WithRSAEncryption",
+          "san_dns": [
+            "cliff-hit-c1.example"
+          ],
+          "is_ca": false,
+          "sha256": "5f10a0fbf3f7217e8f9b332778abcbf5548fc631f828c5fb4c9d0084c29c4e91"
+        },
+        {
+          "path": "cliff-hit/c1.key",
+          "kind": "key",
+          "format": "pem",
+          "reproducible": "bytes",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "encrypted": false,
+          "spki_sha256": "8fdfb1691e7148d405fb43c6213504bb327414aad6dc67fb83c67e353789dd03",
+          "sha256": "070931088c217cf177d121ba722b350cd70401efc49b18caaf7cfde7a2cac2ae"
+        },
+        {
+          "path": "cliff-hit/c2.pem",
+          "kind": "cert",
+          "format": "pem",
+          "reproducible": "bytes",
+          "subject": "CN=cliff-hit-c2.example",
+          "issuer": "CN=cliff-hit-c2.example",
+          "serial": "0x3101",
+          "not_before": "2029-03-17T17:46:40Z",
+          "not_after": "2030-04-01T17:46:40Z",
+          "fingerprint_sha256": "85cef0a14b2be5511d4ab695c04d58b88a56054a27313159058ae94c16f0849a",
+          "spki_sha256": "4ac370c4d249170898f6450bd195f796a1f4430f1d8994d71bf9d3498aec22b2",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "sig_algo": "1.2.840.113549.1.1.11",
+          "sig_algo_name": "sha256WithRSAEncryption",
+          "san_dns": [
+            "cliff-hit-c2.example"
+          ],
+          "is_ca": false,
+          "sha256": "7cb63acd5a4b4ee424ff784278f6d2530a766d1f04f2ccb15e10d4f59fe4fd7a"
+        },
+        {
+          "path": "cliff-hit/c2.key",
+          "kind": "key",
+          "format": "pem",
+          "reproducible": "bytes",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "encrypted": false,
+          "spki_sha256": "4ac370c4d249170898f6450bd195f796a1f4430f1d8994d71bf9d3498aec22b2",
+          "sha256": "2134d2e28bcb35d64ca11c1ff715291c9804a8ce964af88afc964477fb4e5a99"
+        },
+        {
+          "path": "cliff-hit/c3.pem",
+          "kind": "cert",
+          "format": "pem",
+          "reproducible": "bytes",
+          "subject": "CN=cliff-hit-c3.example",
+          "issuer": "CN=cliff-hit-c3.example",
+          "serial": "0x3102",
+          "not_before": "2029-03-17T17:46:40Z",
+          "not_after": "2030-04-06T17:46:40Z",
+          "fingerprint_sha256": "34ced30b300400d0fd0c46593b36aac1d2fd5792859749bada9ef62aae9519c6",
+          "spki_sha256": "111a13de052711153b1c379b989f7db7f56a3f41abfbde3bfff213b609433062",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "sig_algo": "1.2.840.113549.1.1.11",
+          "sig_algo_name": "sha256WithRSAEncryption",
+          "san_dns": [
+            "cliff-hit-c3.example"
+          ],
+          "is_ca": false,
+          "sha256": "6a7927fc6a342861467edf659603547169e42665b6e7f39c7eb7e7ee79562a59"
+        },
+        {
+          "path": "cliff-hit/c3.key",
+          "kind": "key",
+          "format": "pem",
+          "reproducible": "bytes",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "encrypted": false,
+          "spki_sha256": "111a13de052711153b1c379b989f7db7f56a3f41abfbde3bfff213b609433062",
+          "sha256": "000d362a7944615b5913a5e37c9086107f467d0ba26c78f2f0ac14c2870a9754"
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "EXPIRING",
+            "severity": "WARN",
+            "count": 3
+          },
+          {
+            "code": "EXPIRY_CLIFF",
+            "severity": "WARN",
+            "count": 1
+          },
+          {
+            "code": "PRIVATE_KEY_UNENCRYPTED",
+            "severity": "WARN",
+            "count": 3
+          }
+        ],
+        "absent": [
+          "DUPLICATE_CERT",
+          "EXPIRED",
+          "ORPHAN_CERT",
+          "ORPHAN_KEY",
+          "WEAK_KEY",
+          "WEAK_SIG"
+        ]
+      }
+    },
+    {
+      "case": "empty-pass",
+      "group": "supplementary",
+      "purpose": "空口令容器：不带口令就能打开 → CONTAINER_EMPTY_PASSWORD",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "empty-pass/empty-pass.p12"
+      ],
+      "artifacts": [
+        {
+          "path": "empty-pass/empty-pass.p12",
+          "kind": "container",
+          "format": "pkcs12",
+          "reproducible": "alias_table",
+          "entry_count": 1
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "CONTAINER_EMPTY_PASSWORD",
+            "severity": "INFO",
+            "count": 1
+          }
+        ],
+        "absent": [
+          "CONTAINER_TRUSTSTORE_WITH_KEY",
+          "EXPIRED",
+          "EXPIRING",
+          "ORPHAN_CERT",
+          "ORPHAN_KEY",
+          "WEAK_KEY",
+          "WEAK_SIG"
+        ],
+        "container": {
+          "format": "pkcs12",
+          "password": "empty",
+          "has_private_key": true,
+          "entries": [
+            {
+              "alias": "empty-pass",
+              "entry_type": "privateKey",
+              "fingerprint_sha256": "80597631cee3233cd7d778dbd7f33953081f688bcc3b3212b1510f566e508edd",
+              "spki_sha256": "0dcf65db3a9eabd43dbf0d0becd83d3f4d43fb54b7e540e230221d4e32a3b9f5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "case": "perm",
+      "group": "supplementary",
+      "purpose": "权限过宽：POSIX mode 0644 的私钥（POSIX-only，见 platform）",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "perm/perm.pem",
+        "perm/loose.key"
+      ],
+      "artifacts": [
+        {
+          "path": "perm/perm.pem",
+          "kind": "cert",
+          "format": "pem",
+          "reproducible": "bytes",
+          "subject": "CN=perm.example",
+          "issuer": "CN=perm.example",
+          "serial": "0x4002",
+          "not_before": "2029-03-17T17:46:40Z",
+          "not_after": "2031-03-17T17:46:40Z",
+          "fingerprint_sha256": "bafebfa6f5fa9ef02163cfee11a8cc2fc4595b466c18a92c40871bddc1ef5cd9",
+          "spki_sha256": "591bb87f5741d5ced0ac67533a78f8f2e7534eab35926dc2fcbb45e9db0f9547",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "sig_algo": "1.2.840.113549.1.1.11",
+          "sig_algo_name": "sha256WithRSAEncryption",
+          "san_dns": [
+            "perm.example"
+          ],
+          "is_ca": false,
+          "sha256": "8eb18bff871876c2e1a279ab7fd073fc259025671ded7348eadc72628ac8f9c1"
+        },
+        {
+          "path": "perm/loose.key",
+          "kind": "key",
+          "format": "pem",
+          "reproducible": "bytes",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "encrypted": false,
+          "spki_sha256": "591bb87f5741d5ced0ac67533a78f8f2e7534eab35926dc2fcbb45e9db0f9547",
+          "sha256": "a7531f52824d99c755ec18a367fadd1d7414103a17f15aaa765cd829bbf2aff0",
+          "posix_mode": "0644"
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "PERMISSION_TOO_OPEN",
+            "severity": "WARN",
+            "count": 1
+          },
+          {
+            "code": "PRIVATE_KEY_UNENCRYPTED",
+            "severity": "WARN",
+            "count": 1
+          }
+        ],
+        "absent": [
+          "DUPLICATE_CERT",
+          "EXPIRED",
+          "EXPIRING",
+          "ORPHAN_CERT",
+          "ORPHAN_KEY",
+          "WEAK_KEY",
+          "WEAK_SIG"
+        ]
+      },
+      "platform": "posix"
+    },
+    {
+      "case": "bundle",
+      "group": "supplementary",
+      "purpose": "多块 PEM：一个文件里 3 个证书块，逐块展开（offset 0/1/2）",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "bundle/bundle.pem"
+      ],
+      "artifacts": [
+        {
+          "path": "bundle/bundle.pem",
+          "kind": "cert",
+          "format": "pem",
+          "reproducible": "bytes",
+          "offset": 0,
+          "subject": "CN=bundle-b1.example",
+          "issuer": "CN=bundle-b1.example",
+          "serial": "0x5000",
+          "not_before": "2029-03-17T17:46:40Z",
+          "not_after": "2031-03-17T17:46:40Z",
+          "fingerprint_sha256": "a4baf865e2a8f08923c9edc5b503ebfd021649187738e47284a7dd0cb14c271e",
+          "spki_sha256": "09a6a3ecf1f331c5b092594df35f4b716e4b29b8a23f46ffd425fc052f2e83a8",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "sig_algo": "1.2.840.113549.1.1.11",
+          "sig_algo_name": "sha256WithRSAEncryption",
+          "san_dns": [
+            "bundle-b1.example"
+          ],
+          "is_ca": false,
+          "sha256": "bc7a1ebf5faf2f68f90173c6d28ba4ad79d9eae86678944b29ecba25297da1ed",
+          "block_count": 3
+        },
+        {
+          "path": "bundle/bundle.pem",
+          "kind": "cert",
+          "format": "pem",
+          "reproducible": "bytes",
+          "offset": 1,
+          "subject": "CN=bundle-b2.example",
+          "issuer": "CN=bundle-b2.example",
+          "serial": "0x5001",
+          "not_before": "2029-03-17T17:46:40Z",
+          "not_after": "2031-03-17T17:46:40Z",
+          "fingerprint_sha256": "7eca34a9dfdcb0b6c2816736cd51775357e0fb1a031fd75b8c4a71c06c211305",
+          "spki_sha256": "6de2add355107e1d1847aa4fd1901ae41e0832ce149a86edfa56de48dc254023",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "sig_algo": "1.2.840.113549.1.1.11",
+          "sig_algo_name": "sha256WithRSAEncryption",
+          "san_dns": [
+            "bundle-b2.example"
+          ],
+          "is_ca": false,
+          "sha256": "bc7a1ebf5faf2f68f90173c6d28ba4ad79d9eae86678944b29ecba25297da1ed",
+          "block_count": 3
+        },
+        {
+          "path": "bundle/bundle.pem",
+          "kind": "cert",
+          "format": "pem",
+          "reproducible": "bytes",
+          "offset": 2,
+          "subject": "CN=bundle-b3.example",
+          "issuer": "CN=bundle-b3.example",
+          "serial": "0x5002",
+          "not_before": "2029-03-17T17:46:40Z",
+          "not_after": "2031-03-17T17:46:40Z",
+          "fingerprint_sha256": "72acbba9edffc1d0a38a5734c0c658d5000301308e4c1f0e008bb62172273e64",
+          "spki_sha256": "e5c0504df56f8bcb158995b24dbe237ea7e39094dc036d303d982808c499ddad",
+          "key_algo": "rsa",
+          "key_bits": 2048,
+          "key_curve": null,
+          "sig_algo": "1.2.840.113549.1.1.11",
+          "sig_algo_name": "sha256WithRSAEncryption",
+          "san_dns": [
+            "bundle-b3.example"
+          ],
+          "is_ca": false,
+          "sha256": "bc7a1ebf5faf2f68f90173c6d28ba4ad79d9eae86678944b29ecba25297da1ed",
+          "block_count": 3
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "ORPHAN_CERT",
+            "severity": "INFO",
+            "count": 3
+          }
+        ],
+        "absent": [
+          "DUPLICATE_CERT",
+          "EXPIRED",
+          "EXPIRING",
+          "ORPHAN_KEY",
+          "WEAK_KEY",
+          "WEAK_SIG"
+        ]
+      }
+    },
+    {
+      "case": "broken-der",
+      "group": "supplementary",
+      "purpose": "坏 DER：截断字节 → PARSE_FAILED，stage=der，不整体失败",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "broken-der/broken.der"
+      ],
+      "artifacts": [
+        {
+          "path": "broken-der/broken.der",
+          "kind": "broken",
+          "format": "der",
+          "reproducible": "bytes",
+          "sha256": "650756ade57606245c61c609b819e93fa7a7a3eb6b539461b21c6fcced000a1b",
+          "source_der_bytes": 848,
+          "truncated_to_bytes": 282
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "PARSE_FAILED",
+            "severity": "WARN",
+            "count": 1
+          }
+        ],
+        "absent": [
+          "EXPIRED",
+          "EXPIRING",
+          "ORPHAN_CERT",
+          "ORPHAN_KEY",
+          "WEAK_KEY",
+          "WEAK_SIG"
+        ]
+      }
+    },
+    {
+      "case": "noise",
+      "group": "supplementary",
+      "purpose": "二进制噪声：非证书内容 → SKIP_BINARY，不是失败",
+      "as_of": 1900000000,
+      "as_of_utc": "2030-03-17T17:46:40Z",
+      "inputs": [
+        "noise/noise.bin"
+      ],
+      "artifacts": [
+        {
+          "path": "noise/noise.bin",
+          "kind": "noise",
+          "format": "bin",
+          "reproducible": "bytes",
+          "sha256": "366e030c6c374b038ceda64214998ddc0274bdd60bd81ac9dfef3e2d563ce59a",
+          "has_nul_byte": true
+        }
+      ],
+      "expect": {
+        "findings": [
+          {
+            "code": "SKIP_BINARY",
+            "severity": "INFO",
+            "count": 1
+          }
+        ],
+        "absent": [
+          "EXPIRED",
+          "EXPIRING",
+          "PARSE_FAILED",
+          "WEAK_KEY",
+          "WEAK_SIG"
+        ]
+      }
+    }
+  ]
+}

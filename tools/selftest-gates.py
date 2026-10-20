@@ -131,6 +131,27 @@ def set_milestone_status(work: Path, rel: str, milestone: int, replacement: str)
     path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
 
 
+def first_pending_milestone(work: Path) -> int:
+    """The lowest milestone still marked pending in plan/00's status table.
+
+    Hard-coding a number here rots: the mutation silently stops applying as
+    soon as that milestone is completed, and a mutation that cannot be applied
+    tests nothing while looking like a passing case. Selecting the *next*
+    pending one keeps the case meaningful for the whole project.
+    """
+    import re as _re
+
+    pattern = _re.compile(r"^\|\s*\*{0,2}M(\d+)\b")
+    text = (work / "plan/00-README总览.md").read_text(encoding="utf-8")
+    for line in text.split("\n"):
+        match = pattern.match(line)
+        if not match:
+            continue
+        if "⬜" in line or "未开始" in line:
+            return int(match.group(1))
+    raise AssertionError("no pending milestone row found in plan/00 — nothing left to flip")
+
+
 def m04(work: Path) -> None:
     """Mark a milestone completed in every copy while its handoff is absent.
 
@@ -140,9 +161,12 @@ def m04(work: Path) -> None:
     table still lists it — that is correct behaviour, and this case only asserts
     that ``LAYOUT.HANDOFFS`` is among the reported failures.)
     """
+    milestone = first_pending_milestone(work)
     for rel in ("plan/00-README总览.md", "plan/05-里程碑与发布.md", "README.md"):
-        set_milestone_status(work, rel, 1, "✅ 已完成")
-    delete(work / "plan/HANDOFF-M1.md")
+        set_milestone_status(work, rel, milestone, "✅ 已完成")
+    handoff = work / f"plan/HANDOFF-M{milestone}.md"
+    if handoff.exists():
+        delete(handoff)
 
 
 def m05(work: Path) -> None:

@@ -16,8 +16,12 @@ include .gitignore
 # Test suite, including the conftest that puts src/ on sys.path.
 recursive-include tests *.py
 
-# Reproducible sample generator (fixtures/out/ is generated on demand and never shipped).
-recursive-include fixtures *.sh *.md
+# Reproducible sample generator. Both files are needed: gen.sh probes the
+# toolchain and dispatches, gen.py is the engine that writes the truth file.
+# Shipping only the shell would leave the unpacked tree unable to generate
+# anything, and fixtures/expected.json on its own is not reproducible.
+# fixtures/out/ is generated on demand and never shipped.
+recursive-include fixtures *.sh *.py *.md *.json
 
 # Evidence ledger and methodology gates.
 recursive-include plan *.md

@@ -40,7 +40,7 @@
 | `.gitattributes` | 源码 EOL 归一；证书类文件 `-text` | ✅ 已落盘 |
 | `src/certledger/` | CLI + 策略 + 时间基准 + 模型；五个分析模块为空壳（显式未实现） | ✅ 骨架 / ⬜ 分析层 |
 | `tests/` | CLI 面 / 策略 / 时间基准 / 模型 / 架构守门 / README 承诺 | ✅ 已落盘 |
-| `fixtures/gen.sh` | 可复现样本生成脚本（自签根 + 中间 + 叶子，日期与序列号钉死） | ⬜ 待 M1 |
+| `fixtures/gen.sh` + `fixtures/gen.py` | 可复现样本生成脚本（shell 探测工具链 + Python 生成引擎；日期与序列号钉死） | ✅ 已落盘 |
 | `plan/HANDOFF-M<k>.md` | 逐棒交接单（七节）；`plan/HANDOFF-M1.md` 已落盘 | ✅ M1 交接单已落盘 |
 | `plan/RELEASE-M6.md` | 发布留档（tag 前入库；tag 后事实分栏追加） | ⬜ 待 M6 |
 
@@ -141,6 +141,7 @@
 | 阈值零代码字面量 + 出处强制 | CA/B TLS BR v2.3.1 §6.1.5；NIST SP 800-131A Rev.2 | `src/certledger/data/default-policy.json` + `tests/test_policy.py` | ✅ 已实测（M0） |
 | `--as-of` 必填且唯一时间源 | RFC 5280 §4.1.2.5；本机 OpenSSL 实测 | `tests/test_timebase.py` + `tests/test_architecture.py::test_single_clock_source` | ✅ 已实测（M0） |
 | 零网络 | — | `tests/test_architecture.py::test_no_network_imports_anywhere` | ✅ 已实测（M0） |
+| 八类样本可一键重生成 + 真值可独立复算 | `plan/04` §1.1 / §二；OpenSSL 3.5.6 实测 `-not_before`/`-not_after`/`-set_serial` | `fixtures/gen.sh` + `fixtures/gen.py` + `fixtures/expected.json`；`tests/test_fixtures_truth.py`（36 例）；`gen.sh --determinism` 29 个文件字节全等 | ✅ 已实测（M1） |
 | 证书/私钥/容器/系统库同表交叉引用 | 自建实现（无同类先例，见 `plan/01` §1.4） | 设计定稿于 `plan/03` §②；`model.py` 记录结构已落 | ⬜ 待 M3 验证 |
 | 私钥↔证书按 SPKI 配对 | RFC 5280 §4.2.1.2 SKI / SPKI 结构 | 决策 D8 已定口径；`model.py::KeyRecord.paired_cert_fingerprint` 字段已定 | ⬜ 待 M3 验证 |
 | 过期判定确定性（`--as-of`） | OpenSSL 3.5.6 实测 `verify -attime` 正确报 error 10 | `tests/test_timebase.py`（解析与边界）已落；判定本身待 M4 | ⬜ 待 M4 验证（解析已 ✅） |
@@ -162,7 +163,7 @@
 | 里程碑 | 内容 | DoD | 状态 |
 |---|---|---|---|
 | **M0 骨架** | 方法论装订（`AGENTS.md` + 两道门 + `plan/00` 一行）+ `plan/00–06` + 可运行骨架（五子命令参数面 / 策略加载 / 时间基准 / 记录模型）+ CI workflow | 两道门全绿且 14 组变异全红；`pytest` 全绿；`--help` / `--version` 退出 0；非法参数退出 2；未落地能力不伪造空结果 | ✅ 已完成 |
-| **M1 数据先行** | `fixtures/gen.sh` 造八类样本：健康 / 将过期 / 已过期 / 弱密钥 / 弱签名 / 多别名 / truststore 混私钥 / 孤儿私钥；样本真值 | 样本可由脚本一键重生成；日期与序列号钉死（`-not_before` / `-not_after` / `-set_serial`）；`expected.json` 只存输入与期望；**真实证书与私钥零入库** | ⬜ 未开始 |
+| **M1 数据先行** | `fixtures/gen.sh` 造八类样本：健康 / 将过期 / 已过期 / 弱密钥 / 弱签名 / 多别名 / truststore 混私钥 / 孤儿私钥；样本真值 | 样本可由脚本一键重生成；日期与序列号钉死（`-not_before` / `-not_after` / `-set_serial`）；`expected.json` 只存输入与期望；**真实证书与私钥零入库** | ✅ 已完成（2026-10-21） |
 | **M2 采集器** | `collectors`：递归遍历 + 内容嗅探（PEM/DER/PKCS#7/PKCS#12/JKS/JCEKS/PKCS#8/OpenSSH 公钥）+ 三平台后端可插拔 + 降级记录 | 八类格式均能识别；后端缺失产 `SOURCE_UNAVAILABLE` 且退出码 0；遍历顺序稳定；跳过的文件带原因码 | ⬜ 未开始 |
 | **M3 台账** | `inventory`：统一记录模型 + 双指纹 + `sources[]` 合并 + SPKI 配对 | 同证书三处来源合并为一条；同 CN 不同密钥对不被误配；JSON 键序稳定 | ⬜ 未开始 |
 | **M4 卫生规则** | `hygiene`：九类 finding + 策略文件（阈值带出处）+ `--as-of` 必填 | 每条规则有出处的 `rule_source`；无出处阈值不得生效；策略缺失报错退出 2 | ⬜ 未开始 |
