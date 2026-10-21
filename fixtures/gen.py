@@ -270,13 +270,24 @@ def make_certificate(
         database = work / "db"
         database.mkdir(exist_ok=True)
         (database / "index.txt").write_text("", encoding="utf-8")
-        (database / "serial").write_text(f"{serial + 1:04X}\n", encoding="utf-8")
+        # ``ca`` assigns the certificate the serial *currently in the file*, then
+        # increments it — so the file holds the wanted value, not value + 1.
+        (database / "serial").write_text(f"{serial:04X}\n", encoding="utf-8")
         # ``ca`` refuses a second certificate with the same subject unless this
         # is set; every case signs from a fresh database anyway.
         (database / "index.txt.attr").write_text("unique_subject = no\n", encoding="utf-8")
 
         extensions = [
             f"basicConstraints = critical,CA:{'TRUE' if is_ca else 'FALSE'}",
+            # Declared as ``none`` on purpose. ``openssl ca`` fills in a
+            # Subject Key Identifier by default, and *which* defaults it fills
+            # in has changed between releases — so the same invocation produced
+            # a different DER on OpenSSL 3.0 (the CI runners) and 3.5 (this
+            # machine), which made the truth file irreproducible across
+            # platforms. Every extension the certificate carries is now named
+            # here; nothing is left to a version-dependent default.
+            "subjectKeyIdentifier = none",
+            "authorityKeyIdentifier = none",
         ]
         if is_ca:
             extensions.append("keyUsage = critical,keyCertSign,cRLSign")

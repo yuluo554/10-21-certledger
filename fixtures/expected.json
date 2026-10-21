@@ -36,10 +36,10 @@
           "reproducible": "bytes",
           "subject": "CN=healthy.example",
           "issuer": "CN=healthy.example",
-          "serial": "0x1002",
+          "serial": "0x1001",
           "not_before": "2029-03-17T17:46:40Z",
           "not_after": "2031-03-17T17:46:40Z",
-          "fingerprint_sha256": "94c41546d3e08358f0ada8e5954f8be387d9cbb8e2977e005bd51818b5db734f",
+          "fingerprint_sha256": "fa5c8b2d6b688c467526b1d3a254b632b796a3d8aca4619c4effbb688eaf41c3",
           "spki_sha256": "e208e19fd6e8e7ce4fcff81bb5e5296a12d07444fd3830d90692a2e041370744",
           "key_algo": "rsa",
           "key_bits": 2048,
@@ -50,7 +50,7 @@
             "healthy.example"
           ],
           "is_ca": false,
-          "sha256": "a70d243b53c90d76400a71915e0d44d1aa0765924d8bd46324b4369a69e99930"
+          "sha256": "98117890e92db24e1c144eb794241a998beb15b528aa979480a8d19667d92c15"
         },
         {
           "path": "healthy/healthy.key",
@@ -105,10 +105,10 @@
           "reproducible": "bytes",
           "subject": "CN=expiring.example",
           "issuer": "CN=expiring.example",
-          "serial": "0x1003",
+          "serial": "0x1002",
           "not_before": "2029-03-17T17:46:40Z",
           "not_after": "2030-03-27T17:46:40Z",
-          "fingerprint_sha256": "ae9fde60b332989628d23a8cbe5d5afae69f97bfe891f88d891ff76006649ec3",
+          "fingerprint_sha256": "10417b8bc07f836b733013f2548eb99c9b46681493cd1c3bb57818e858aaf72f",
           "spki_sha256": "1d2b39e78d1737ff151f1aeece2c1c2d7bd4903ce9bde80f2817d625abe933ac",
           "key_algo": "rsa",
           "key_bits": 2048,
@@ -119,7 +119,7 @@
             "expiring.example"
           ],
           "is_ca": false,
-          "sha256": "7c0426350f7a1ce95b8b8e84bc3448d45fda2c1a042721104c0e8bc425b86df6"
+          "sha256": "ba1927722234228c22ceedaa85b0c4a83b0858e4d7e6722c23715b75f71c4c8c"
         },
         {
           "path": "expiring/expiring.key",
@@ -177,10 +177,10 @@
           "reproducible": "bytes",
           "subject": "CN=expired.example",
           "issuer": "CN=expired.example",
-          "serial": "0x1004",
+          "serial": "0x1003",
           "not_before": "2029-02-10T17:46:40Z",
           "not_after": "2030-03-12T17:46:40Z",
-          "fingerprint_sha256": "6dc9d1231cbcc1d6b758a18f0cb3f0ac6699b9992597072c2f8088917ae03ed6",
+          "fingerprint_sha256": "7b0c6b3fccd81be510a72cc9a582f2d1982e6e42b3ccd423297bad4e99d8c7b0",
           "spki_sha256": "fec392f1c031d8779bb0a6002627653630ef8d0cc9141d976826a4a24683bb29",
           "key_algo": "rsa",
           "key_bits": 2048,
@@ -191,7 +191,7 @@
             "expired.example"
           ],
           "is_ca": false,
-          "sha256": "ee9cfc35f4a7b7ee515b5f7bdd157ea6b0a3334dea0e8162eae42219016c0ead"
+          "sha256": "24905afbaf06277d75a83ac83e0b5f09acfc9517d6bcc1779ec801f05841eb0c"
         },
         {
           "path": "expired/expired.key",
@@ -248,10 +248,10 @@
           "reproducible": "bytes",
           "subject": "CN=weak-key.example",
           "issuer": "CN=weak-key.example",
-          "serial": "0x1005",
+          "serial": "0x1004",
           "not_before": "2029-03-17T17:46:40Z",
           "not_after": "2031-03-17T17:46:40Z",
-          "fingerprint_sha256": "11abf35e9c933dde5486683c824e8446ba437737796c87e5914f53bcb42258d9",
+          "fingerprint_sha256": "af09afefd0c6da775dd9c40dceb06a3dab13619b6ad54a1e7aae8d632509fca9",
           "spki_sha256": "4d30e5d0cf0401d561fe437d56abe29ee4082aa96842cd583cd91975e8ecdf66",
           "key_algo": "rsa",
           "key_bits": 1024,
@@ -262,7 +262,7 @@
             "weak-key.example"
           ],
           "is_ca": false,
-          "sha256": "2a46b6dc4101c7e854656ddd08f361968fd320ed4b59a408f73cf6dc729b615f"
+          "sha256": "45fb56ed8d59402adbcc777d415c038e2a263964877ea28331e4bb846bf23cbf"
         },
         {
           "path": "weak-key/weak-key.key",
@@ -319,10 +319,10 @@
           "reproducible": "bytes",
           "subject": "CN=weak-sig.example",
           "issuer": "CN=weak-sig.example",
-          "serial": "0x1006",
+          "serial": "0x1005",
           "not_before": "2029-03-17T17:46:40Z",
           "not_after": "2031-03-17T17:46:40Z",
-          "fingerprint_sha256": "041a54ac7e7335ce91282aee39e3d91b65f4acd8669f3880b87fe3215572c40e",
+          "fingerprint_sha256": "893cb71440334312ca691f7c1185ca63abd94679df9edbf130aabe59d20727fd",
           "spki_sha256": "c2190a6f3a9b5b37ebd244c65d00d177bb9041993bac3f4d087f2f0ae053f71f",
           "key_algo": "rsa",
           "key_bits": 2048,
@@ -333,7 +333,7 @@
             "weak-sig.example"
           ],
           "is_ca": false,
-          "sha256": "147cff5c40c3cbaa1ec8e36c8c8e0ec675c9087eb3f54b27ef693740b21eb981"
+          "sha256": "890f142725a2804d8ff7be36031c291f32e1ef2184b9f7bfbbd37c1fff911b89"
         },
         {
           "path": "weak-sig/weak-sig.key",
@@ -420,13 +420,13 @@
             {
               "alias": "multi-alias-primary",
               "entry_type": "trustedCert",
-              "fingerprint_sha256": "d472a9bec4df7244e4ffb1df7bd6d3d714aefc2ea908ab976885c4b96f3ac1bb",
+              "fingerprint_sha256": "ca356d0b84964440ff0c7f27339e3f71c1baa580a0adc8ac4952e0b1b3593d9b",
               "spki_sha256": "f45033653645c52cf7451279fcddbaddc5c8f944ef7cd62ab0008b112f9a1687"
             },
             {
               "alias": "multi-alias-secondary",
               "entry_type": "trustedCert",
-              "fingerprint_sha256": "d472a9bec4df7244e4ffb1df7bd6d3d714aefc2ea908ab976885c4b96f3ac1bb",
+              "fingerprint_sha256": "ca356d0b84964440ff0c7f27339e3f71c1baa580a0adc8ac4952e0b1b3593d9b",
               "spki_sha256": "f45033653645c52cf7451279fcddbaddc5c8f944ef7cd62ab0008b112f9a1687"
             }
           ]
@@ -482,13 +482,13 @@
             {
               "alias": "key-entry",
               "entry_type": "privateKey",
-              "fingerprint_sha256": "31b60ceebf9460a71d5880cc4c654b3db16562482ca8b8d9dfc3d7b5fbfd861e",
+              "fingerprint_sha256": "924c1545ebe1d8022f84ba24af2ba89111d852225c86747c25b5fbf0753c1b5c",
               "spki_sha256": "af8a7f4b427d56f6335113a18247461c97423543aebf2147d835aff303abd717"
             },
             {
               "alias": "trusted-only",
               "entry_type": "trustedCert",
-              "fingerprint_sha256": "0534de67e8341ae05d18ab80ae27ce1a98a04529c5272fb1f5ffd7026ae4bec6",
+              "fingerprint_sha256": "365ddcec88827156d927efb2c905f2664471eef48d049fc54fcf78d87ecb37e8",
               "spki_sha256": "e0a29c748be05320a719b41d00a273de8f44687d91dd24c7f2c1b23db87bacff"
             }
           ]
@@ -526,10 +526,10 @@
           "reproducible": "bytes",
           "subject": "CN=orphan-cert.example",
           "issuer": "CN=orphan-cert.example",
-          "serial": "0x100a",
+          "serial": "0x1009",
           "not_before": "2029-03-17T17:46:40Z",
           "not_after": "2031-03-17T17:46:40Z",
-          "fingerprint_sha256": "32e68fb4cc5fa2b39add627a86856779fb456d5e82968f473487fc931941662e",
+          "fingerprint_sha256": "6d223c4ab9f7ec9cf2007d6e6c416eb29a36cc9c115f70686045ea7410eb978f",
           "spki_sha256": "e7c0223ea675b96d06c7d415424adcf87e7ccb4a9c77e5d18ab25153bd974492",
           "key_algo": "rsa",
           "key_bits": 2048,
@@ -540,7 +540,7 @@
             "orphan-cert.example"
           ],
           "is_ca": false,
-          "sha256": "02cb29bb2bf56303d11e639328354bbbcdc814ee797c70b87ae39ffd53d4deda"
+          "sha256": "156c45ed272f253fd967f995118236073188b903e783a8aff3832a88fbfaaf19"
         }
       ],
       "expect": {
@@ -589,10 +589,10 @@
           "reproducible": "bytes",
           "subject": "CN=pair.example",
           "issuer": "CN=pair.example",
-          "serial": "0x2002",
+          "serial": "0x2001",
           "not_before": "2029-03-17T17:46:40Z",
           "not_after": "2031-03-17T17:46:40Z",
-          "fingerprint_sha256": "3789183a4c4ba17c97c13135c26394af9de741e544ff09b552b93d4ee3fbdfe2",
+          "fingerprint_sha256": "f5c29aa293c70a82e6fb13ea7bd5aa40fe077d64fee9cb6cd29cde3bdb51dcc5",
           "spki_sha256": "9b6434e246152ae7a507794fd277416712e3c209ca0017015ec2b5192ae9aa2c",
           "key_algo": "rsa",
           "key_bits": 2048,
@@ -603,7 +603,7 @@
             "pair.example"
           ],
           "is_ca": false,
-          "sha256": "eb7afdc46394fa16b9e374e5524251834e675205245c44457313e9a44a7b3d35"
+          "sha256": "bbcc49354c43ccc1c64d595f62da599ae0628d3d14032d5a39713929618d7194"
         },
         {
           "path": "pair/key.pem",
@@ -654,10 +654,10 @@
           "reproducible": "bytes",
           "subject": "CN=shared.example",
           "issuer": "CN=shared.example",
-          "serial": "0x2003",
+          "serial": "0x2002",
           "not_before": "2029-03-17T17:46:40Z",
           "not_after": "2031-03-17T17:46:40Z",
-          "fingerprint_sha256": "a05228e7da0e413b090e32305a541724da3a07fde566213d944784dfa52f87df",
+          "fingerprint_sha256": "7472f0abe3bd96ad62bfb02bbb1ab74a86f8692bc797a7cef4c8d761f24ec225",
           "spki_sha256": "d38da5c044d199f02d11cb10e7a88c1e956d9cc6dadaf8920cb8c73fa1373052",
           "key_algo": "rsa",
           "key_bits": 2048,
@@ -668,7 +668,7 @@
             "shared.example"
           ],
           "is_ca": false,
-          "sha256": "4d594edd6d5e15847701025c053c2344c9cd260a46837eb159d24f7f6959201d"
+          "sha256": "5639249bf11d25cc35f78694b3db7bef1640fc5261779b3ac52148ef5c9f94d9"
         },
         {
           "path": "same-cn/key.pem",
@@ -728,10 +728,10 @@
           "reproducible": "bytes",
           "subject": "CN=cliff-none-c1.example",
           "issuer": "CN=cliff-none-c1.example",
-          "serial": "0x3001",
+          "serial": "0x3000",
           "not_before": "2029-03-17T17:46:40Z",
           "not_after": "2030-03-27T17:46:40Z",
-          "fingerprint_sha256": "d869fbd09621705b458846136179d19624a01821ac3f02e5469900bcb34ee3ff",
+          "fingerprint_sha256": "297870274a3edbc41b65bf333d82b5113d73eb1035bd42842d89e59cf68695ec",
           "spki_sha256": "c7a893e2bdc81907cf0b8f9ca5111d41ccea18d9daf09fc0fa0946fe6348c854",
           "key_algo": "rsa",
           "key_bits": 2048,
@@ -742,7 +742,7 @@
             "cliff-none-c1.example"
           ],
           "is_ca": false,
-          "sha256": "9197509eb9e3389778e087fd1c70a020135458e15bcfd00e31823ce0c2ea9d73"
+          "sha256": "8567a82c8b2f3bed4d37c9227f6c5fcae70d413f7053190a294e3c76ca781d11"
         },
         {
           "path": "cliff-none/c1.key",
@@ -802,10 +802,10 @@
           "reproducible": "bytes",
           "subject": "CN=cliff-hit-c1.example",
           "issuer": "CN=cliff-hit-c1.example",
-          "serial": "0x3101",
+          "serial": "0x3100",
           "not_before": "2029-03-17T17:46:40Z",
           "not_after": "2030-03-27T17:46:40Z",
-          "fingerprint_sha256": "66b2a9ae8135bc27c22da51aeae624e0c3db87e374b4734293d3f6db4d62c85a",
+          "fingerprint_sha256": "a1a66cf47b54bb0a0d13bb6b1128597853ef88969832e7d7c3106eb06b984ff1",
           "spki_sha256": "8fdfb1691e7148d405fb43c6213504bb327414aad6dc67fb83c67e353789dd03",
           "key_algo": "rsa",
           "key_bits": 2048,
@@ -816,7 +816,7 @@
             "cliff-hit-c1.example"
           ],
           "is_ca": false,
-          "sha256": "4a2321201580808d256d51bcbee66c3adf0bd722b81c75e1e03586bb846e72ea"
+          "sha256": "ca44bcd1c3515c76325948ef9351e7840dd7536fc4747d65b2e7a34fee869792"
         },
         {
           "path": "cliff-hit/c1.key",
@@ -837,10 +837,10 @@
           "reproducible": "bytes",
           "subject": "CN=cliff-hit-c2.example",
           "issuer": "CN=cliff-hit-c2.example",
-          "serial": "0x3102",
+          "serial": "0x3101",
           "not_before": "2029-03-17T17:46:40Z",
           "not_after": "2030-04-01T17:46:40Z",
-          "fingerprint_sha256": "cacfa18312a1399cc3d4bebfc8adc6ea7d5db009e6d0faa2ad11f09a583fb010",
+          "fingerprint_sha256": "5a437d6d081660732143c47481cd2e01e1a1f9db7f4383c74ccfcca40255ddf8",
           "spki_sha256": "4ac370c4d249170898f6450bd195f796a1f4430f1d8994d71bf9d3498aec22b2",
           "key_algo": "rsa",
           "key_bits": 2048,
@@ -851,7 +851,7 @@
             "cliff-hit-c2.example"
           ],
           "is_ca": false,
-          "sha256": "eff7cbb25e735d414ec2228f92b8db73f014cedbc830f5f2764e2e29c55b8528"
+          "sha256": "cb06276adf02556c70277a66f9fd30b34ac4cbcaab7a65afc4cde85651243351"
         },
         {
           "path": "cliff-hit/c2.key",
@@ -872,10 +872,10 @@
           "reproducible": "bytes",
           "subject": "CN=cliff-hit-c3.example",
           "issuer": "CN=cliff-hit-c3.example",
-          "serial": "0x3103",
+          "serial": "0x3102",
           "not_before": "2029-03-17T17:46:40Z",
           "not_after": "2030-04-06T17:46:40Z",
-          "fingerprint_sha256": "720937cb1d02b72868c3d50df9db629cd5e9b0cf0793e7711f5a2df9513207dd",
+          "fingerprint_sha256": "df94a9aa67a76f1a5f9538daea6c9d00fdf5a80bb4db91db06fc9a567abacd6a",
           "spki_sha256": "111a13de052711153b1c379b989f7db7f56a3f41abfbde3bfff213b609433062",
           "key_algo": "rsa",
           "key_bits": 2048,
@@ -886,7 +886,7 @@
             "cliff-hit-c3.example"
           ],
           "is_ca": false,
-          "sha256": "a7d5aa487584dec588044c8423adac348f6564c7febff6f4ff04606ebbe9f012"
+          "sha256": "9832a68102e2820d4b9a601dd46e7fa573aee537797eef852216872a56478095"
         },
         {
           "path": "cliff-hit/c3.key",
@@ -972,7 +972,7 @@
             {
               "alias": "empty-pass",
               "entry_type": "privateKey",
-              "fingerprint_sha256": "96ca5500cedd336e991420acd98060142d3fc7f8142bf810763f6ec48ac80c61",
+              "fingerprint_sha256": "1217f41d6e1d1e3ffe59026db4ae70430acc321fc1fb89bc0c6c7364ce6a49a4",
               "spki_sha256": "0dcf65db3a9eabd43dbf0d0becd83d3f4d43fb54b7e540e230221d4e32a3b9f5"
             }
           ]
@@ -997,10 +997,10 @@
           "reproducible": "bytes",
           "subject": "CN=perm.example",
           "issuer": "CN=perm.example",
-          "serial": "0x4003",
+          "serial": "0x4002",
           "not_before": "2029-03-17T17:46:40Z",
           "not_after": "2031-03-17T17:46:40Z",
-          "fingerprint_sha256": "c4316052783a0eca52a0ae08d742989af85251def2700d7d67fec2f31ab1472f",
+          "fingerprint_sha256": "1ff1173785dda38013a45ecc0330352b0cdc0c059eef3512ac8f4ff89a90bf2a",
           "spki_sha256": "591bb87f5741d5ced0ac67533a78f8f2e7534eab35926dc2fcbb45e9db0f9547",
           "key_algo": "rsa",
           "key_bits": 2048,
@@ -1011,7 +1011,7 @@
             "perm.example"
           ],
           "is_ca": false,
-          "sha256": "e9a95cc7cb348d441079c375fed6993bcf76a0c2f382889bdcf01371e8dc33a9"
+          "sha256": "f74dc9c06edbfbb24ac413ca22344666c6b7c75fc28573672340f8d840a691a0"
         },
         {
           "path": "perm/loose.key",
@@ -1070,10 +1070,10 @@
           "offset": 0,
           "subject": "CN=bundle-b1.example",
           "issuer": "CN=bundle-b1.example",
-          "serial": "0x5001",
+          "serial": "0x5000",
           "not_before": "2029-03-17T17:46:40Z",
           "not_after": "2031-03-17T17:46:40Z",
-          "fingerprint_sha256": "50b26c4f3a68796a9166115f3b3c5ea355411dae96aff439bb4b1dd9216a804a",
+          "fingerprint_sha256": "bf34269a98cba5ce451c61cebc93efdd6027d556a949242f67483735f3b119ae",
           "spki_sha256": "09a6a3ecf1f331c5b092594df35f4b716e4b29b8a23f46ffd425fc052f2e83a8",
           "key_algo": "rsa",
           "key_bits": 2048,
@@ -1084,7 +1084,7 @@
             "bundle-b1.example"
           ],
           "is_ca": false,
-          "sha256": "197dd36b17692d81c6f7815e7eb85f3f6ee42fd3690e61738b41d64ff3c7db79",
+          "sha256": "f22cdbb350a49c73bef6be1827c531e1660f75a4ca5e585786f46393e0558ab0",
           "block_count": 3
         },
         {
@@ -1095,10 +1095,10 @@
           "offset": 1,
           "subject": "CN=bundle-b2.example",
           "issuer": "CN=bundle-b2.example",
-          "serial": "0x5002",
+          "serial": "0x5001",
           "not_before": "2029-03-17T17:46:40Z",
           "not_after": "2031-03-17T17:46:40Z",
-          "fingerprint_sha256": "5cb6ef4e453558a1dc82a0e2ec49d66d023c737fa9c27dba88bc28d9d74d17d8",
+          "fingerprint_sha256": "4d62d9c43195f164719b57becc6e0426610f3a03dfa8af3eaaef24801664cc42",
           "spki_sha256": "6de2add355107e1d1847aa4fd1901ae41e0832ce149a86edfa56de48dc254023",
           "key_algo": "rsa",
           "key_bits": 2048,
@@ -1109,7 +1109,7 @@
             "bundle-b2.example"
           ],
           "is_ca": false,
-          "sha256": "197dd36b17692d81c6f7815e7eb85f3f6ee42fd3690e61738b41d64ff3c7db79",
+          "sha256": "f22cdbb350a49c73bef6be1827c531e1660f75a4ca5e585786f46393e0558ab0",
           "block_count": 3
         },
         {
@@ -1120,10 +1120,10 @@
           "offset": 2,
           "subject": "CN=bundle-b3.example",
           "issuer": "CN=bundle-b3.example",
-          "serial": "0x5003",
+          "serial": "0x5002",
           "not_before": "2029-03-17T17:46:40Z",
           "not_after": "2031-03-17T17:46:40Z",
-          "fingerprint_sha256": "c6b57683114609ce510b99fae8d78afe8525c40d101ed31450e3e7a06e218b21",
+          "fingerprint_sha256": "652063bfdf8e0c5078bd01233d5ac25407f25a3474b344f459f7dd9d20abf1c5",
           "spki_sha256": "e5c0504df56f8bcb158995b24dbe237ea7e39094dc036d303d982808c499ddad",
           "key_algo": "rsa",
           "key_bits": 2048,
@@ -1134,7 +1134,7 @@
             "bundle-b3.example"
           ],
           "is_ca": false,
-          "sha256": "197dd36b17692d81c6f7815e7eb85f3f6ee42fd3690e61738b41d64ff3c7db79",
+          "sha256": "f22cdbb350a49c73bef6be1827c531e1660f75a4ca5e585786f46393e0558ab0",
           "block_count": 3
         }
       ],
@@ -1171,9 +1171,9 @@
           "kind": "broken",
           "format": "der",
           "reproducible": "bytes",
-          "sha256": "3f0ad8fe53b2c085e1c0c98430c07fca52fa358e1ade315125c41d402f4e8d03",
-          "source_der_bytes": 813,
-          "truncated_to_bytes": 271
+          "sha256": "a67e035c2597f7982a4f50d203d5421ab67fbdd55598f2d673e3beadc4907c6b",
+          "source_der_bytes": 782,
+          "truncated_to_bytes": 260
         }
       ],
       "expect": {
