@@ -21,6 +21,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # The workflow self-check below imports ``yaml``. A bare setup-python runner
+      # has no third-party packages, so without this step the job fails with
+      # ``ModuleNotFoundError: No module named 'yaml'`` — a red gate that says
+      # nothing about the repository.
+      - name: Install the workflow self-check dependency
+        run: python -m pip install --upgrade pip pyyaml
       - name: Sprint layout gate (methodology binding)
         run: python tools/check-sprint-layout.py
       - name: Desensitization gate (no host paths / usernames / local proxy)

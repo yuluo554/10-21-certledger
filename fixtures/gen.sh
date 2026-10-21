@@ -32,7 +32,10 @@ case "${1:-}" in
         ;;
 esac
 
-# ── ① OpenSSL ≥ 3.0（-not_before / -not_after 需要 3.x） ────────────────────
+# ── ① OpenSSL ≥ 3.0 ─────────────────────────────────────────────────────────
+# 证书由 `openssl ca -startdate/-enddate` 签发（日期钉死在固定值上）。这些选项
+# 早于 3.0 就有；而 `req -x509` 的 `-not_before/-not_after` 要到 3.5 才出现，
+# CI 的发行版镜像多为 3.0——用那条路会让样本只能装在 3.5 的机器上生成。
 command -v openssl >/dev/null 2>&1 \
     || die "找不到 openssl。样本的日期与序列号要靠它钉死；请安装 OpenSSL ≥ 3.0 后重试。"
 
@@ -44,8 +47,8 @@ case "${OPENSSL_MAJOR}" in
     ''|*[!0-9]*) die "无法解析 openssl 版本号：${OPENSSL_VERSION}" ;;
 esac
 if [ "${OPENSSL_MAJOR}" -lt 3 ]; then
-    die "OpenSSL ${OPENSSL_VERSION} 太旧。需要 ≥ 3.0（3.x 才有 -not_before / -not_after，
-        旧版本只能按当前时刻推算有效期，样本会不可复现）。"
+    die "OpenSSL ${OPENSSL_VERSION} 太旧。需要 ≥ 3.0（3.x 才有稳定的 ca -startdate/-enddate
+        与 AES-256-CBC 的 PKCS#12 导出；旧版本会让样本不可复现）。"
 fi
 
 # ── ② keytool（可选；探到就报告，探不到就明说本次跳过什么） ─────────────────

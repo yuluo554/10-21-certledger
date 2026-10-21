@@ -110,6 +110,40 @@ def make_dir_link(link: Path, target: Path) -> None:
     link.symlink_to(target, target_is_directory=True)
 
 
+def _sample_certificate() -> bytes:
+    """A PEM certificate built on the spot, for tests that need a real one.
+
+    ``fixtures/out`` is generated on demand and **CI never generates it**, so a
+    test that reaches into it silently changes meaning there. This builds the
+    smallest certificate the sniffer will accept.
+    """
+    if OUT.is_dir():
+        sample = OUT / "healthy" / "healthy.pem"
+        if sample.is_file():
+            return sample.read_bytes()
+
+    import datetime as dt
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "link.example")])
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(1)
+        .not_valid_before(dt.datetime(2020, 1, 1, tzinfo=dt.timezone.utc))
+        .not_valid_after(dt.datetime(2035, 1, 1, tzinfo=dt.timezone.utc))
+        .sign(key, hashes.SHA256())
+    )
+    return certificate.public_bytes(serialization.Encoding.PEM)
+
+
 # ── ① eight format classes ──────────────────────────────────────────────────
 
 
@@ -360,13 +394,17 @@ def test_permission_denied_is_always_a_diagnostic(policy, monkeypatch) -> None:
 
 
 def test_symlink_is_skipped_by_default_and_followed_on_request(tmp_path, policy) -> None:
+    """The link is skipped; the real directory is still walked exactly once.
+
+    The file behind the link has to be a *recognisable* certificate: with
+    unrecognisable bytes the walk produces no candidate at all (it is skipped as
+    ``SKIP_UNKNOWN_FORMAT``), so the count below would measure the placeholder
+    text rather than the walk. Building the certificate here keeps the test
+    independent of ``fixtures/out``, which CI never generates.
+    """
     real = tmp_path / "real"
     real.mkdir()
-    (real / "c.pem").write_bytes(
-        (OUT / "healthy" / "healthy.pem").read_bytes()
-        if OUT.is_dir()
-        else b"-----BEGIN CERTIFICATE-----\n"
-    )
+    (real / "c.pem").write_bytes(_sample_certificate())
     make_dir_link(tmp_path / "link", real)
 
     off = collect(roots=[str(tmp_path)], files=[], source="none",

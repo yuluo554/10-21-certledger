@@ -21,8 +21,8 @@ drift apart.
 
 Reproducibility rules this file is written to satisfy:
 
-* every certificate is signed by OpenSSL with ``-set_serial`` and pinned
-  ``-not_before`` / ``-not_after`` — two runs produce byte-identical files;
+* every certificate is signed by ``openssl ca`` with pinned ``-startdate`` /
+  ``-enddate`` and a pinned serial — two runs produce byte-identical files;
 * every RSA key comes from a deterministic SHA-256 counter stream, so a fresh
   clone reproduces the same key bytes without shipping a key;
 * PKCS#12 bytes are **not** reproducible (random salt and IV), so containers are
@@ -83,7 +83,7 @@ def iso(seconds: int) -> str:
 
 
 def openssl_stamp(seconds: int) -> str:
-    """``[CC]YYMMDDHHMMSSZ`` — the format ``-not_before`` expects."""
+    """``[CC]YYMMDDHHMMSSZ`` — the format ``ca -startdate`` / ``-enddate`` expect."""
     return datetime.fromtimestamp(seconds, tz=timezone.utc).strftime("%Y%m%d%H%M%SZ")
 
 
@@ -243,48 +243,116 @@ def make_certificate(
     """Sign a certificate with a pinned serial and pinned validity.
 
     ``issuer`` is ``(ca_cert, ca_key)`` for a CA-signed leaf, ``None`` for a
-    self-signed one. Both go through one OpenSSL invocation so there is exactly
-    one signing path.
+    self-signed one. Both go through one signing path.
+
+    **Why ``openssl ca`` and not ``openssl req``.** ``req -x509`` grew
+    ``-not_before`` / ``-not_after`` only in **OpenSSL 3.5**; the distro builds
+    the CI runners carry (3.0) reject them with ``req: Use -help for summary``,
+    so the earlier generator could only produce samples on one machine's OpenSSL.
+    ``ca`` has pinned dates through ``-startdate`` / ``-enddate`` since long
+    before 3.0, pins the serial through its database, and — unlike
+    ``cryptography`` 50, which refuses to *sign* with SHA-1 — still emits the
+    ``sha1WithRSAEncryption`` certificate the ``weak-sig`` sample exists to
+    describe. One path, both properties, every OpenSSL ≥ 3.0.
+
+    The subject and extensions are passed through a **config file** rather than
+    ``-subj /CN=…``: on Windows, MSYS rewrites an argument that looks like a
+    ``/path`` into a native path, which turns ``/CN=x`` into ``D:/…/CN=x`` and
+    fails the request (observed locally and on the Windows runners).
     """
-    argv = [
-        "openssl",
-        "req",
-        "-x509",
-        "-key",
-        str(key_path),
-        f"-{digest}",
-        "-subj",
-        f"/CN={common_name}",
-        "-set_serial",
-        hex(serial),
-        "-not_before",
-        openssl_stamp(not_before),
-        "-not_after",
-        openssl_stamp(not_after),
-    ]
-    if issuer is not None:
-        argv += ["-CA", str(issuer[0]), "-CAkey", str(issuer[1])]
-    if is_ca:
-        argv += [
-            "-addext",
-            "basicConstraints=critical,CA:TRUE",
-            "-addext",
-            "keyUsage=critical,keyCertSign,cRLSign",
+    # Signing material lives in a throwaway directory, never beside the artifact:
+    # a case directory must contain **exactly** the files the truth lists as
+    # inputs, and ``ca`` writes a config, a request, a serial and a database.
+    # Leaving those behind makes the tree disagree with the truth file — the
+    # failure the "declared inputs" test exists to catch.
+    with tempfile.TemporaryDirectory(prefix="certledger-sign-") as tmp:
+        work = Path(tmp)
+        database = work / "db"
+        database.mkdir(exist_ok=True)
+        (database / "index.txt").write_text("", encoding="utf-8")
+        (database / "serial").write_text(f"{serial + 1:04X}\n", encoding="utf-8")
+        # ``ca`` refuses a second certificate with the same subject unless this
+        # is set; every case signs from a fresh database anyway.
+        (database / "index.txt.attr").write_text("unique_subject = no\n", encoding="utf-8")
+
+        extensions = [
+            f"basicConstraints = critical,CA:{'TRUE' if is_ca else 'FALSE'}",
         ]
-    else:
-        argv += [
-            "-addext",
-            "basicConstraints=critical,CA:FALSE",
-            "-addext",
-            "keyUsage=critical,digitalSignature,keyEncipherment",
-            "-addext",
-            "extendedKeyUsage=serverAuth",
+        if is_ca:
+            extensions.append("keyUsage = critical,keyCertSign,cRLSign")
+        else:
+            extensions.append("keyUsage = critical,digitalSignature,keyEncipherment")
+            extensions.append("extendedKeyUsage = serverAuth")
+            if san:
+                extensions.append(f"subjectAltName = DNS:{san}")
+
+        config = work / "ca.cnf"
+        config.write_text(
+            "\n".join(
+                [
+                    "[ca]",
+                    "default_ca = CA_default",
+                    "[CA_default]",
+                    f"dir = {database.as_posix()}",
+                    f"database = {(database / 'index.txt').as_posix()}",
+                    f"serial = {(database / 'serial').as_posix()}",
+                    f"new_certs_dir = {database.as_posix()}",
+                    f"default_md = {digest}",
+                    "policy = policy_any",
+                    "x509_extensions = ext",
+                    "unique_subject = no",
+                    "[policy_any]",
+                    "commonName = supplied",
+                    "[req]",
+                    "distinguished_name = dn",
+                    "prompt = no",
+                    "[dn]",
+                    f"CN = {common_name}",
+                    "[ext]",
+                    *extensions,
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+
+        request = work / "request.csr"
+        run(
+            ["openssl", "req", "-new", "-key", str(key_path), "-config", str(config),
+             "-out", str(request)],
+            what=f"生成证书请求 {out_path.name}（CN={common_name}）",
+        )
+
+        argv = [
+            "openssl",
+            "ca",
+            "-config",
+            str(config),
+            "-in",
+            str(request),
+            "-startdate",
+            openssl_stamp(not_before),
+            "-enddate",
+            openssl_stamp(not_after),
+            "-batch",
+            # Without ``-notext`` ``ca`` prepends a human-readable dump of the
+            # certificate, and the file then starts with ``Certificate:`` rather
+            # than ``-----BEGIN CERTIFICATE-----``. The sniffer classifies by
+            # prefix, so every sample would be skipped as "unrecognised" — a
+            # whole fixture tree that looks generated and contains nothing the
+            # tool can read.
+            "-notext",
+            "-out",
+            str(out_path),
         ]
-        if san:
-            argv += ["-addext", f"subjectAltName=DNS:{san}"]
-    argv += ["-out", str(out_path)]
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    run(argv, what=f"签发 {out_path.name}（CN={common_name}）")
+        if issuer is None:
+            argv += ["-selfsign", "-keyfile", str(key_path)]
+        else:
+            issuer_cert_path, issuer_key_path = issuer
+            argv += ["-cert", str(issuer_cert_path), "-keyfile", str(issuer_key_path)]
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        run(argv, what=f"签发 {out_path.name}（CN={common_name}）")
 
 
 # ── reading artifacts back (never guessing) ─────────────────────────────────

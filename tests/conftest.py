@@ -119,13 +119,24 @@ def issue_certificate():
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
         )
         if write_key:
-            (directory / f"{name}.key").write_bytes(
+            key_path = directory / f"{name}.key"
+            key_path.write_bytes(
                 key.private_bytes(
                     encoding=serialization.Encoding.PEM,
                     format=serialization.PrivateFormat.PKCS8,
                     encryption_algorithm=serialization.NoEncryption(),
                 )
             )
+            # Owner-only, like ``fixtures/gen.py::write_private_key``. Without
+            # this the file lands at the umask default (0644 on POSIX) and every
+            # test that only wants "a key that pairs" also gets
+            # ``PERMISSION_TOO_OPEN`` — a finding the test never asked for, and
+            # one that appears on Linux/macOS but not on Windows. That is how a
+            # green Windows run hid a red CI run.
+            try:
+                key_path.chmod(0o600)
+            except OSError:  # pragma: no cover - filesystems without POSIX modes
+                pass
         return {
             "path": der_path,
             "der": der,

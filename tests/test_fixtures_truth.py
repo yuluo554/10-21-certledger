@@ -576,6 +576,62 @@ def _pem_cert_blocks(raw: bytes) -> list[bytes]:
 # ── ⑤ generator behaviour: --only / --check / --determinism ────────────────
 
 
+def _usable_bash() -> str | None:
+    """A ``bash`` that actually runs, or ``None``.
+
+    On Windows ``bash`` on ``PATH`` is usually ``C:\\Windows\\System32\\bash.exe``
+    — the WSL launcher, which fails outright when no distribution is installed
+    (it prints a UTF-16 "Windows Subsystem for Linux has no installed
+    distributions" and exits). Git Bash is installed on the GitHub runners and
+    on a normal developer box, just not under that name, so it is probed
+    explicitly. Returning ``None`` makes the caller *skip with a reason* rather
+    than fail: the generator is a bash script, and "no bash here" is a fact about
+    the machine, not about the generator.
+    """
+    candidates = ["bash"]
+    if sys.platform == "win32":
+        candidates += [
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files\Git\usr\bin\bash.exe",
+            r"C:\Program Files (x86)\Git\bin\bash.exe",
+        ]
+    for candidate in candidates:
+        try:
+            probe = subprocess.run(
+                [candidate, "-c", "echo ok"],
+                capture_output=True,
+                timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if probe.returncode == 0 and b"ok" in probe.stdout:
+            return candidate
+    return None
+
+
+BASH = _usable_bash()
+needs_bash = pytest.mark.skipif(BASH is None, reason="没有可用的 bash（gen.sh 是 bash 脚本）")
+
+
+def _run_gen(*args: str, timeout: int = 900) -> subprocess.CompletedProcess:
+    """Run ``gen.sh`` with a bash that works, decoding output as UTF-8.
+
+    ``text=True`` alone decodes with the *locale* encoding, and on Windows that
+    is cp1252/cp936 — the generator's Chinese messages then arrive as mojibake
+    (or raise) and the failure looks like a generator bug. The script writes
+    UTF-8 (``PYTHONUTF8`` is set in CI), so decoding is pinned here.
+    """
+    return subprocess.run(
+        [BASH, str(GEN_SH), *args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        cwd=str(ROOT),
+        timeout=timeout,
+    )
+
+
 def test_gen_sh_exists_and_is_executable_by_bash() -> None:
     text = GEN_SH.read_text(encoding="utf-8")
     assert text.startswith("#!/usr/bin/env bash")
@@ -583,29 +639,20 @@ def test_gen_sh_exists_and_is_executable_by_bash() -> None:
     assert "--check" in text and "--only" in text and "--out" in text
 
 
+@needs_bash
 def test_generator_refuses_a_missing_openssl(monkeypatch) -> None:
     """Missing toolchain is exit 2 with a sentence, never a silent downgrade."""
-    result = subprocess.run(
-        ["bash", str(GEN_SH), "--help"],
-        capture_output=True,
-        text=True,
-        cwd=str(ROOT),
-    )
+    result = _run_gen("--help", timeout=120)
     assert result.returncode == 0, result.stderr
     assert "--out" in result.stdout
     assert "--check" in result.stdout
 
 
+@needs_bash
 def test_only_does_not_rewrite_the_truth_file(tmp_path) -> None:
     """A partial run must never narrow the committed case list (``plan/04`` §三)."""
     before = TRUTH_PATH.read_bytes()
-    result = subprocess.run(
-        ["bash", str(GEN_SH), "--only", "healthy", "--out", str(tmp_path / "out")],
-        capture_output=True,
-        text=True,
-        cwd=str(ROOT),
-        timeout=600,
-    )
+    result = _run_gen("--only", "healthy", "--out", str(tmp_path / "out"))
     assert result.returncode == 0, result.stdout + result.stderr
     assert TRUTH_PATH.read_bytes() == before, "--only 改写了 expected.json 的全集清单"
     produced = sorted(p.name for p in (tmp_path / "out").rglob("*") if p.is_file())
@@ -613,18 +660,14 @@ def test_only_does_not_rewrite_the_truth_file(tmp_path) -> None:
     assert "expired.pem" not in produced
 
 
+@needs_bash
 def test_unknown_case_name_is_a_usage_error(tmp_path) -> None:
-    result = subprocess.run(
-        ["bash", str(GEN_SH), "--only", "no-such-case", "--out", str(tmp_path / "out")],
-        capture_output=True,
-        text=True,
-        cwd=str(ROOT),
-        timeout=300,
-    )
+    result = _run_gen("--only", "no-such-case", "--out", str(tmp_path / "out"), timeout=300)
     assert result.returncode == 2, result.stdout + result.stderr
     assert "no-such-case" in result.stderr
 
 
+@needs_bash
 def test_generator_probes_the_optional_keytool(tmp_path) -> None:
     """``keytool`` is optional (D2): probe and say so, never fail the run.
 
@@ -632,13 +675,7 @@ def test_generator_probes_the_optional_keytool(tmp_path) -> None:
     shim but ``keytool`` does not — so the probe has to look in the JDK tree
     rather than trusting ``command -v`` alone.
     """
-    result = subprocess.run(
-        ["bash", str(GEN_SH), "--only", "healthy", "--out", str(tmp_path / "out")],
-        capture_output=True,
-        text=True,
-        cwd=str(ROOT),
-        timeout=600,
-    )
+    result = _run_gen("--only", "healthy", "--out", str(tmp_path / "out"), timeout=600)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "keytool" in result.stderr, "生成器必须报告 keytool 探测结果（可用或跳过）"
     assert "跳过" in result.stderr or "可用" in result.stderr
@@ -665,20 +702,16 @@ def test_manifest_records_format_and_command_per_file() -> None:
 
 
 @_HAVE_ARTIFACTS
+@needs_bash
 def test_check_path_reports_what_it_skipped() -> None:
     """``--check`` must print the container skip count, not hide it."""
-    result = subprocess.run(
-        ["bash", str(GEN_SH), "--check"],
-        capture_output=True,
-        text=True,
-        cwd=str(ROOT),
-        timeout=900,
-    )
+    result = _run_gen("--check")
     assert result.returncode == 0, result.stdout + result.stderr
     assert "容器字节跳过" in result.stdout
     assert "alias 表比对" in result.stdout
 
 
+@needs_bash
 def test_truth_file_is_reproducible(tmp_path) -> None:
     """The truth document must regenerate byte-for-byte.
 
@@ -694,13 +727,7 @@ def test_truth_file_is_reproducible(tmp_path) -> None:
     """
     before = TRUTH_PATH.read_bytes()
     for index in (1, 2):
-        result = subprocess.run(
-            ["bash", str(GEN_SH), "--out", str(tmp_path / f"run{index}")],
-            capture_output=True,
-            text=True,
-            cwd=str(ROOT),
-            timeout=900,
-        )
+        result = _run_gen("--out", str(tmp_path / f"run{index}"))
         assert result.returncode == 0, result.stdout + result.stderr
         assert TRUTH_PATH.read_bytes() == before, f"第 {index} 次重生成改写了 expected.json 的字节"
 

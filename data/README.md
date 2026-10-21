@@ -184,9 +184,12 @@ CA/B Forum BR 时间表（BR.md 日期表 + §6.3.2 原文核对）：
 
 ### 4.1 生成器与可复现性
 
-- 唯一生成入口：`fixtures/gen.sh`（OpenSSL 3.5.6 + JDK 24 `keytool`）。
-- **日期钉死**：所有证书用 `-not_before` / `-not_after`（或等价固定时长 + 固定基准日）指定，**不使用相对当前时刻的默认值**。
-- **序列号钉死**：`-set_serial` 显式指定，保证同参数多次运行产出**同指纹**证书。
+- 唯一生成入口：`fixtures/gen.sh`（OpenSSL ≥ 3.0 + JDK `keytool`，可选）。
+- **日期钉死**：所有证书用 `openssl ca -startdate` / `-enddate` 指定（固定基准日 + 固定偏移），**不使用相对当前时刻的默认值**。
+  用 `ca` 而不是 `req -x509` 的理由：`req` 的 `-not_before/-not_after` 要到 **OpenSSL 3.5** 才有，
+  而 CI 的发行版镜像多为 3.0——那条路会让样本只能在装了 3.5 的机器上生成（M6 首推实测）。
+  `ca` 同时能签 SHA-1 证书，而 `cryptography` 50 拒绝用 SHA-1 签名，`weak-sig` 样本因此只能走 `ca`。
+- **序列号钉死**：`openssl ca` 的序列号来自其数据库（写死初值），保证同参数多次运行产出**同指纹**证书。
 - 生成参数写入 `fixtures/out/manifest.json`（每项：文件名 / 格式 / 期望结论 / 生成命令）。
 - 允许的例外：PKCS#12 的 salt 与迭代随机化、JKS 容器的时间戳字段会导致**容器文件字节**不可复现——因此**基线比对的对象是台账 JSON，不是容器文件字节**（口径见 §4.4）。
 
