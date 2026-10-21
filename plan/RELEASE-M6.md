@@ -21,6 +21,25 @@
 | 打包产物 | sdist + wheel 由本树构建；解包后的 sdist 树里 `bash fixtures/gen.sh --check` 通过，且**不含** `fixtures/out/` 与任何证书/私钥字节 | `python -m build --sdist --wheel`；sha256 见 §二 |
 | 隐私 | `git status --porcelain --untracked-files=all` 无 `*.pem/*.key/*.p12/*.pfx/*.jks/*.jceks/*.der/*.crt` | 见「本机环境」 |
 | 发布形态 | A 方案：GitHub Release **附手工源码包**（`certledger-0.1.0.tar.gz`），sha256 只登记在 Release 正文 | `gh release view v0.1.0` |
+| CI 首推 | 全绿：run `39540591781`，8 个 job（layout / no-residue / tests × 6）；headSha = tag 指向的 commit | `gh run view 39540591781` |
+
+### 首推 CI 抓到的缺陷（本 tag 内已修，先红后绿）
+
+本机（Windows + OpenSSL 3.5.6）全绿，**首推后 CI 全红**。这不是"CI 配错了"——是六类只在
+另一平台上才暴露的真实缺陷，逐条修完才绿：
+
+| # | 缺陷 | 为什么本机看不见 | 修法 |
+|---|---|---|---|
+| 1 | 生成器用 `openssl req -x509 -not_before/-not_after` | 本机 OpenSSL 3.5.6 支持；CI 的 3.0 报 `req: Use -help for summary` | 先改 `ca -startdate/-enddate`，最终改 `cryptography` 自建 TBS |
+| 2 | `openssl ca` 的输出在 3.0 与 3.5 上字节不同 | 本机只有一个版本 | 同上：去掉 OpenSSL 签名路径 |
+| 3 | Windows 上 `bash` 是 WSL 启动器（无发行版）；`text=True` 按 locale 解码 | 本机 bash 是 Git Bash | 显式探 Git Bash；输出固定 UTF-8 解码；找不到就 skip 并给理由 |
+| 4 | 符号链接测试在无 `fixtures/out` 时写占位文本 | 本机有 `fixtures/out` | 现场造一张真证书 |
+| 5 | 测试夹具写私钥用默认 umask（POSIX 0644）→ 多出 `PERMISSION_TOO_OPEN` | Windows 上 `posix_mode` 记 `null` | 夹具显式 `chmod 0600` |
+| 6 | CI 的 layout job 缺 `pyyaml` | 本机 `.venv` 装了 | workflow 里装依赖 |
+
+另有一处**发布阻塞缺陷**在干净环境验证时抓到（不依赖 CI）：`report --markdown` 在读过系统库的
+机器上必失败——真实根证书的 subject 自带 URL（`CN=http://www.usertrust.com`），被「零外链」
+守门当成链接。修法与验收见下节。
 
 ### 干净环境验证（M6 第 3 步）
 
@@ -65,24 +84,37 @@ unset CERTLEDGER_CONTAINER_PASSWORD
 
 ### 未发生的事（照实记）
 
-- **CI 从未实跑**（首推前一概如此）；本机等价物 = 双解释器不可得，故只 3.12 + 两道门 + `selftest-gates` + CLI 冒烟。
 - **本机从未跑过 Linux 真实路径**（无 `/etc/ssl/certs/ca-certificates.crt`）**与 macOS 后端**。
+  区分清楚：CI 跑通了 Linux 上的**测试**，但测试用的是注入的 bundle，不是那个真实路径。
 - **BKS / UBER 等非 JDK 容器格式从未验证**（落 `CONTAINER_UNREADABLE`，不静默）。
+
+> **"CI 绿"是先红后绿拿到的**：tag 之前 CI 实跑了四轮——`39527273833`、
+> `39534488059`、`39536509191` 三红，`39540591781` 全绿，且这一轮的 `headSha`
+> 正是 tag 指向的 commit。run id 与每轮失败原因见 §二与上表。
 
 ---
 
 ## 二、tag 后追加
 
 > 本节在 **tag `v0.1.0` 之后的追加提交**里填写字面值；tag 树版本为占位。
+> **以下字面值都在 tag 之后写入**，不在 tag 树内——tag 树里那一栏只有占位符。
 
 | 事实 | 字面值 |
 |---|---|
-| tag 对象 OID | 见 `git rev-parse v0.1.0` |
-| tag 指向的 commit | 见 `git rev-parse v0.1.0^{commit}` |
-| CI 首推 run id | 见本仓库 Actions 页 `v0.1.0` 之前最近一次 push 的 run（G3 关闭证据） |
-| `certledger-0.1.0.tar.gz` sha256 | 见 Release 正文 |
-| `certledger-0.1.0-py3-none-any.whl` sha256 | 见 Release 正文 |
-| Release 地址 | `https://github.com/yuluo554/10-21-certledger/releases/tag/v0.1.0` |
+| tag 对象 OID | `77a61038153728a85826280f7b82ec3585b8a89a` |
+| tag 指向的 commit | `37f80a6e2c14df45c9f05c79540efbd320c52b93`（`证书生成改由 cryptography 自建 TBS…`） |
+| CI 首推 run id | **`39540591781`**（G3 关闭证据）。该 run 的 `headSha` 正是 tag 指向的 `37f80a6`；8 个 job 全绿：`Methodology gates` / `no-residue` / `Tests (py3.10,3.12,3.13) × (ubuntu, windows)` |
+| 首推前失败的 run（留档） | `39527273833`（6 类跨平台缺陷）、`39534488059`（Windows 全绿、Linux 真值漂移）、`39536509191`（`ca` 的扩展集已钉住仍漂移）——三次失败的原因与修正见 §一「本步实录」与 git log |
+| `certledger-0.1.0.tar.gz` sha256 | `137b89ed58e1458eec95dc31c70c956dbc40a62439c6db340944ddd068a1c29a`（300,685 bytes；已用 `gh release download` 取回复算，与本地构建一致） |
+| wheel | **未附**。A 方案只要"手工源码包"；wheel 是平台无关的同一份代码，附上会多一个需要复算的哈希而没有新增可审计面 |
+| Release 地址 | `https://github.com/yuluo554/10-21-certledger/releases/tag/v0.1.0`（`isDraft=false`、`isPrerelease=false`，附件 `certledger-0.1.0.tar.gz`） |
+
+### tag 之后需要知道的一件事
+
+`openssl` 已不在证书签名路径上。首推暴露的第三个问题（`ca` 的输出在 OpenSSL 3.0 与 3.5
+上字节不同）意味着**真值文件的指纹曾经取决于跑生成器的机器**；改成 `cryptography` 自建
+TBS 之后，`expected.json` 才真正与平台无关。这条修正落在 tag 树内（`37f80a6`），
+CI 的 Linux job 是它的验收——**先红后绿**，不是本机推断。
 
 ---
 
@@ -90,7 +122,8 @@ unset CERTLEDGER_CONTAINER_PASSWORD
 
 > 三态：**实现**（有可复跑证据）/ **不适用**（附理由，属已决定不做或平台前提不满足）/
 > **待首推**（本机不可实跑，首推后由 §二 回填）。逐项对齐 `plan/05` §二 DoD、§五 已知未验证项
-> 与 `plan/06` §三 缺口表。
+> 与 `plan/06` §三 缺口表。**首推已完成**：原为「待首推」的两项（#13 CI 矩阵、#14 Release 产物）
+> 已按实际 run id 与包哈希回填为「实现」；其余「不适用」项的理由不因发布而改变。
 
 | # | 覆盖项 | 三态 | 依据 / 理由 |
 |---|---|---|---|
@@ -106,6 +139,6 @@ unset CERTLEDGER_CONTAINER_PASSWORD
 | 10 | Windows ACL「权限过宽」判定 | 不适用 | 已定稿不做（`data/README` §六，G5） |
 | 11 | `PUBLIC_VALIDITY_HINT` 展示层提示 | 不适用 | 已定稿不进 `findings`（`plan/06` G8） |
 | 12 | Linux `/etc/ssl/certs/ca-certificates.crt` 真实路径 | 不适用 | 本机无该文件；读取与 PEM 拆分路径已用真实 bundle 注入实测 |
-| 13 | CI 矩阵（ubuntu / windows × 3.10–3.13） | 待首推 | 本机只有 3.8 / 3.12；首推后回填 run id（G3） |
-| 14 | Release 附手工源码包 + sha256 登记 | 待首推 | tag 后录入 §二；包哈希不复算不写进 tag 树（A 方案） |
+| 13 | CI 矩阵（ubuntu / windows × 3.10 / 3.12 / 3.13） | 实现 | run `39540591781`（8 job 全绿）。**先红后绿**：前三次 run 暴露 6 类跨平台缺陷 + 真值随 OpenSSL 版本漂移，逐条修完后才绿（G3 关闭） |
+| 14 | Release 附手工源码包 + sha256 登记 | 实现 | `certledger-0.1.0.tar.gz` 已附，sha256 写在 Release 正文；取回复算一致（§二）。tag 树内仍是占位符（A 方案） |
 | 15 | 开源空白（`total_count` 软论据） | 不适用 | 软论据，检索式与窗口记入 `data/README` §1.3，可复算；不作为硬承诺 |
