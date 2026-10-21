@@ -222,7 +222,7 @@ CA/B Forum BR 时间表（BR.md 日期表 + §6.3.2 原文核对）：
 
 ## 五、数值口径纪律（**一处定义**；plan/01、plan/00、代码注记一律引用本节）
 
-> 以下 1–8 条只在本节定义，其他文档与代码不得手写第二口径。**代码零默认字面量**：策略缺失即报错退出（退出码 2）。
+> 以下 1–14 条只在本节定义，其他文档与代码不得手写第二口径。**代码零默认字面量**：策略缺失即报错退出（退出码 2）。
 
 1. **`--as-of` 语义**：
    - 取值 = 一个显式时间点（UTC，接受 ISO-8601 与 Unix 秒）；
@@ -264,6 +264,42 @@ CA/B Forum BR 时间表（BR.md 日期表 + §6.3.2 原文核对）：
    | `2` | 输入/策略/参数错误（缺 `--as-of`、策略文件缺失或字段非法、根路径不可读、输出路径不可写） |
    - **后端不可用不改变退出码**（plan/00 D11）：`SOURCE_UNAVAILABLE` 是 INFO 级记录。
 9. **排序**：`severity → code → subject → fingerprint`（均升序，字符串按码点比较）。报告 Markdown 与 JSON 共用同一排序。
+10. **失败路径分级**：采集/容器阶段产生的每个诊断码都**必须**成为一条 finding，
+   级别在策略文件 `hygiene.diagnostics.codes` 里逐条给出，未列出的码取
+   同一块的 `default`。理由：只列"找到了什么"的报告，与"根本没读那台机器"的报告，
+    在纸面上无法区分。`SOURCE_UNAVAILABLE` 恒 `INFO`（D11，不改变退出码）。
+11. **`level: off` 的语义**：该规则**不产 finding**，但其本应产出的条数计入
+    `summary.suppressed`（按码分组为 `suppressed_by_code`）。关掉一条规则必须留下痕迹，
+    否则"规则被关了"与"机器上没问题"会渲染成同一份报告。
+12. **severity 与阈值同源**：每条规则的 `level`（`ERROR` / `WARN` / `INFO` / `off`）
+    与它的数值阈值写在策略文件的同一块里，代码不写任何默认级别。
+13. **权限判据的单位**：`hygiene.permissions.max_posix_mode` 是八进制**字符串**
+    （`"640"`），判定用位掩码 `actual & ~permitted & 0o777`。
+    来源记录里的 `posix_mode` 由采集器在**读到文件的那一刻**取，之后不再重读——
+    台账可能被另一台机器上的 `hygiene` 消费，在那里 `stat` 描述的是另一个文件系统。
+    无 POSIX 模式的平台（Windows）记 `null`，该平台因此不产 `PERMISSION_TOO_OPEN`：
+    **没有 mode 不等于 mode 过宽**。
+14. **未知不等于弱**：`key_algo` 为空串表示"本构建解不出这个公钥算法"（本机实测 81 张
+    真实存储证书里有 1 张），不是"密钥弱"；`sig_algo` 为无短名的 OID 时同样不产
+    `WEAK_SIG`。规则只在**读到证据**时才断言。
+15. **容器信号（口径 M5 定稿）**：容器三条 finding 只读台账 `containers[]`，判据写死在这里。
+    - `CONTAINER_TRUSTSTORE_WITH_KEY` ⟺ **有私钥条目且**有非私钥条目（一个 truststore
+      兼当 keystore 用；PKCS#12 侧由 bag 结构判定，JKS 侧由 `PrivateKeyEntry` 判定）；
+    - `CONTAINER_EMPTY_PASSWORD` ⟺ 容器**用空口令就能打开**（`password == "empty"`）；
+    - `CONTAINER_UNREADABLE` ⟺ 容器在字节上属于已知家族但打不开（无口令、口令不对、
+      `keytool` 缺失/超时/非零退出），级别取 `hygiene.diagnostics.codes`。
+    - **口令的读取口径**：只从**环境变量**读——变量名由 `--password-env <VAR>` 指定，
+      缺省 `CERTLEDGER_CONTAINER_PASSWORD`。**不写进 argv、不落盘、不进报告**；
+      报告里只有 `password ∈ {set, empty, unknown}`。
+    - **除用户给的口令外只额外试空口令**（`b""` 与 `None` 两种写法，覆盖 keytool/OpenSSL
+      与 `cryptography` 自造的无加密包）。**代码里没有产品默认口令、没有口令字典**：
+      试"空"是判据，试"某个常见口令"是猜测，后者不进规则集。
+    - **容器内的私钥记 `encrypted: true`**：它在容器里受容器口令保护，不是明文散落的文件；
+      "这层保护够不够"由 `CONTAINER_EMPTY_PASSWORD` 回答，故容器来源的私钥不产
+      `PRIVATE_KEY_UNENCRYPTED`。
+    - **`containers[].entries[].chain_length`**：JKS/JCEKS 取 `keytool` 报的链长；
+      **PKCS#12 恒为 0**——bag 结构不区分"链成员"与"外来可信证书"，把额外证书数当链长
+      正是 `keytool` 在 `truststore-with-key` 上犯的错。
 
 ---
 
@@ -275,4 +311,24 @@ CA/B Forum BR 时间表（BR.md 日期表 + §6.3.2 原文核对）：
 | JKS 变体（BKS / UBER / JCEKS 私有扩展）覆盖度 | ⬜ 未逐一实测 | 首期只保证 keytool 能读的那些；未覆盖格式产 `CONTAINER_UNREADABLE` |
 | OpenSSH 私钥（`OPENSSH PRIVATE KEY`）加密态判定细节 | ⬜ 未实测 | 首期只做格式识别与"是否加密"粗判，细节留 M2 定稿 |
 | 开源空白判定 | ⬜ 软论据 | 检索式与 total_count 见 §1.3，可复算；不与硬锚点并列 |
-| Windows ACL → "过宽"的映射规则 | ⬜ 未定稿 | 首期只做 POSIX 严格判定；Windows 侧先出 INFO 提示，M4 定稿后再升 |
+| Windows ACL → "过宽"的映射规则 | ✅ 已定稿（2026-10-21）：**不做 ACL 判定** | 理由见下。Windows 侧不产 `PERMISSION_TOO_OPEN`，`posix_mode` 记 `null` |
+
+### Windows ACL 为什么不做（G5 定稿）
+
+三条理由，按分量排序：
+
+1. **判定需要读 ACL，而 ACL 不是文件属性。** 有效权限 = 文件 DACL ∪ 父目录继承 ∪ 组成员
+   展开 ∪ 拒绝项优先级，还要区分 `Everyone` / `Users` / `Authenticated Users` 的语义差别。
+   在 Windows 上正确地做这件事要么走 `icacls` 输出解析（本地化排版、`(OI)(CI)` 标志、
+   继承链），要么走 Win32 API（本项目零依赖底线不允许）。两条路都会把"权限过宽"变成
+   一个**会误报**的判据，而误报会直接毁掉报告的可信度（这与 D3 的理由同源）。
+2. **误报的代价不对称。** 一张 `C:\ProgramData` 下继承来的 `Users:R` 证书在真实环境里
+   到处都是；把每一张都报成"权限过宽"会让报告淹没在一条不会有人修的 finding 里。
+3. **POSIX 侧已经能给出一条可执行、可复算的判据**，而它覆盖了本项目实际跑得到的那一侧。
+
+**因此**：`hygiene.permissions` 只在记录里存在 `posix_mode` 时判定；Windows 上前端
+记 `null`，规则静默。这不是"未实现"，是**已决定不做的判据**——把它记成未验证项会让
+下一棒去实现一个已经被否掉的东西。
+
+> 若将来要做，判据必须先在 `data/README.md` 本节写下"哪些 ACL 组合算过宽"，
+> 再进策略文件，再进代码——顺序不能倒（K3）。

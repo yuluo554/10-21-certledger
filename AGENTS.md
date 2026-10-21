@@ -37,12 +37,12 @@ python tools/check-desensitized.py       # 脱敏门；发布前必须 0 命中
 | 编号 | 约定 | 落点 |
 | --- | --- | --- |
 | K1 | 指纹一律对 **DER 原始字节**做 SHA-256，不重新编码后再哈希 | `plan/00` D6；`src/certledger/parsing/fingerprint.py` 是唯一入口 |
-| K2 | `--as-of` **必填**，代码里不存在"回退到 `now()`"的分支 | `plan/00` D7；`cli.py` 与 `domain/timebase.py` |
+| K2 | `--as-of` **必填**，代码里不存在"回退到 `now()`"的分支 | `plan/00` D7；`src/certledger/cli.py` 与 `src/certledger/timebase.py` |
 | K3 | 阈值只从策略文件读，**代码零默认字面量**；策略缺失/非法 → 退出码 2 | `plan/00` D10；`src/certledger/policy/loader.py` |
 | K4 | 配对键一律 `spki_sha256`，不用文件名 / subject / SKI | `plan/00` D8；`data/README.md` §五.6 |
 | K5 | 报告不含时间戳、耗时、主机名、用户名；JSON 键序 = schema 声明序 | `plan/00` D9；`src/certledger/render/` |
 | K6 | 后端不可用 → 一条 `SOURCE_UNAVAILABLE`，**退出码不变** | `plan/00` D11 |
-| K7 | 退出码 `0/1/2` 语义见 `data/README.md` §五.8；骨架期临时码 `3`（未实现）**必须在 M5 退役**，退役时四处同步 | `plan/06` 缺口表 G1 |
+| K7 | 退出码 `0/1/2` 语义见 `data/README.md` §五.8；骨架期临时码 `3`（未实现）**已在 M5 退役**，四处同步已完成 | `plan/06` 缺口表 G1（已关闭）；`plan/02` §五（零临时码设计）；`tests/test_architecture.py::test_no_module_still_refuses_to_answer` + `tests/test_cli.py::test_no_command_claims_an_unimplemented_capability`；`plan/00` 台账 |
 
 ## 本机环境事实与禁忌
 

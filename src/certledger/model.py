@@ -17,6 +17,12 @@ from typing import Any, Iterable
 
 SCHEMA_VERSION = 1
 
+#: The ``kind`` a stored ledger declares. Defined with the record model because
+#: both the writer (``inventory``) and the two readers (``hygiene``, the report
+#: pipeline) have to agree on it, and a second literal is how a document stops
+#: being read back.
+LEDGER_KIND = "inventory"
+
 #: Finding severities, in report order (lower = more severe).
 SEVERITY_ORDER = {"ERROR": 0, "WARN": 1, "INFO": 2}
 
@@ -32,6 +38,12 @@ class Source:
     alias: str | None = None
     entry_type: str | None = None
     store_name: str | None = None
+    #: POSIX permission bits as an octal string (``"600"``), ``None`` where the
+    #: platform has no POSIX mode (Windows) or where the answer is not a file
+    #: property (a store entry). Recorded here rather than re-stat'ed later:
+    #: ``hygiene`` may run against a stored ledger on a different machine, and
+    #: re-reading the file there would describe a different directory.
+    posix_mode: str | None = None
 
     def sort_key(self) -> tuple[int, str, str]:
         return (
@@ -48,6 +60,7 @@ class Source:
             "alias": self.alias,
             "entry_type": self.entry_type,
             "store_name": self.store_name,
+            "posix_mode": self.posix_mode,
         }
 
 
@@ -57,6 +70,11 @@ class CertRecord:
     spki_sha256: str
     subject: str
     issuer: str
+    #: SHA-256 of the ``Name`` DER as stored (plan/03 §② 记录模型). Two records
+    #: from one CA share this even when their display strings differ, which is
+    #: what makes it usable as a grouping key; the display string is for humans.
+    subject_der_sha256: str = ""
+    issuer_der_sha256: str = ""
     san_dns: tuple[str, ...] = ()
     san_ip: tuple[str, ...] = ()
     san_email: tuple[str, ...] = ()
@@ -77,8 +95,8 @@ class CertRecord:
         return {
             "fingerprint_sha256": self.fingerprint_sha256,
             "spki_sha256": self.spki_sha256,
-            "subject": self.subject,
-            "issuer": self.issuer,
+            "subject": {"display": self.subject, "der_sha256": self.subject_der_sha256},
+            "issuer": {"display": self.issuer, "der_sha256": self.issuer_der_sha256},
             "san": {
                 "dns": list(self.san_dns),
                 "ip": list(self.san_ip),

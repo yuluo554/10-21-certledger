@@ -9,7 +9,7 @@ from __future__ import annotations
 
 __all__ = ["__version__", "SCHEMA_VERSION"]
 
-__version__ = "0.1.0.dev0"
+__version__ = "0.1.0"
 
 #: Bumped whenever the report/inventory JSON shape changes in a way that would
 #: invalidate a stored baseline. Independent from ``__version__`` (see plan/02 §四).

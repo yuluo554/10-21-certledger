@@ -1,10 +1,14 @@
 """Command line surface.
 
-M0 status: the full parameter surface is live (``--help``, ``--version``,
-validation, exit codes 0/1/2), while the analysis modules are still empty
-shells. A shell raises :class:`NotImplementedError`; this module turns that into
-exit code 2 with a plain sentence — never into an empty result, because
-"0 certificates found" is an answer we would be inventing.
+The full parameter surface is live (``--help``, ``--version``, validation, exit
+codes 0/1/2) and every subcommand answers. ``main`` remains the single place
+where a raised condition becomes a process exit code: ``CliError`` → 2, and 0/1
+come back from the handler that computed them.
+
+``NotImplementedError`` is still caught, but nothing raises it any more — it is
+the net under a future stage that is added to the surface before it is
+implemented, so that such a stage cannot reach the user as a traceback or, far
+worse, as an empty document that reads like an answer.
 
 User-facing text must never cite internal milestone numbers: a promise written
 against an internal plan goes stale the moment the plan moves (plan/06 R7).
@@ -158,6 +162,10 @@ def build_parser() -> argparse.ArgumentParser:
                             help="read the container password from this environment variable")
     containers.add_argument("--policy", metavar="PATH", default=None,
                             help="policy file with thresholds and citations (default: bundled)")
+    # ``--json`` is accepted here as well as before the subcommand: ``plan/03`` §⑤
+    # documents it *after* the positional paths, and the global position keeps
+    # working (see ``_add_json_option``).
+    _add_json_option(containers)
     containers.set_defaults(handler=_run_containers)
 
     return parser
@@ -180,9 +188,15 @@ def _validate(args: argparse.Namespace) -> None:
     Deliberately ordered so that a bad argument is reported before expensive
     work starts, and so that tests can distinguish "bad input" from
     "not implemented yet".
+
+    The ``--roots``/``--files`` requirement is gated on the subcommand actually
+    *having* those inputs. ``containers`` takes positional paths instead and
+    carries ``--policy``; testing for ``policy`` alone made it fall into this
+    branch and raise ``AttributeError`` on a missing ``roots`` attribute — a
+    traceback with exit code 1, which the exit-code contract does not allow.
     """
-    leaves = ("roots", "files", "source", "follow_symlinks", "policy")
-    if any(hasattr(args, leaf) for leaf in leaves):
+    has_path_inputs = hasattr(args, "roots") or hasattr(args, "files")
+    if has_path_inputs:
         if not getattr(args, "inventory", None):
             _require_input(args)
         if getattr(args, "max_size", None) is not None and args.max_size < 1:
@@ -246,9 +260,9 @@ def _run_hygiene(args: argparse.Namespace) -> int:
 
 def _run_report(args: argparse.Namespace) -> int:
     _validate(args)
-    from certledger.render import render
+    from certledger.pipeline import report
 
-    return render(
+    return report(
         roots=args.roots or (),
         files=args.files or (),
         inventory_path=args.inventory,

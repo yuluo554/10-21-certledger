@@ -96,48 +96,34 @@ def m02(work: Path) -> None:
 
 
 def m03(work: Path) -> None:
-    """Write a completed milestone back into plan/06's gap column."""
-    replace(
-        work / "plan/06-交付对标与决策.md",
-        "| G3 | CI 实跑（无远端） | M6 首推后回填真实 run id |",
-        "| G3 | CI 实跑（无远端） | 待 M0 收尾 |",
-    )
+    """Write a completed milestone into plan/06's gap column.
 
-
-def set_milestone_status(work: Path, rel: str, milestone: int, replacement: str) -> None:
-    """Flip one milestone's status inside the *status table* of one document.
-
-    Rewriting only the ``⬜`` marker is not enough: these rows also carry prose
-    that may mention ⬜ elsewhere, and the gate reads pending markers from the
-    whole row. The mutation must therefore produce a row that says "done" to a
-    human as well as to the gate.
+    Injected rather than substituted. The earlier version rewrote G3's row, which
+    tied the mutation to that row's wording — and the row legitimately changed
+    when the milestone closed, after which the mutation could not apply at all
+    (the same rot ``m09`` was fixed for). A fresh row naming an already-done
+    milestone tests the gate rather than the current contents of the table.
     """
-    import re as _re
-
-    path = work / rel
+    path = work / "plan/06-交付对标与决策.md"
     lines = path.read_text(encoding="utf-8").split("\n")
-    pattern = _re.compile(rf"^\|\s*\*{{0,2}}M{milestone}\b")
-    changed = False
-    for i, line in enumerate(lines):
-        if not pattern.match(line):
-            continue
-        if "⬜" not in line and "未开始" not in line:
-            continue
-        lines[i] = line.replace("⬜ 未开始", replacement).replace("⬜", replacement)
-        changed = True
-        break
-    if not changed:
-        raise AssertionError(f"no pending M{milestone} row found in {rel}")
+    header = next(
+        (i for i, line in enumerate(lines) if line.startswith("|") and "缺口" in line),
+        None,
+    )
+    if header is None:
+        raise AssertionError("gap table header not found")
+    lines.insert(header + 2, "| G99 | 变异行（自检注入） | 待 M0 收尾 |")
     path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
 
 
-def first_pending_milestone(work: Path) -> int:
-    """The lowest milestone still marked pending in plan/00's status table.
+def completed_milestone_with_handoff(work: Path) -> int:
+    """A milestone that is done **and** whose handoff file is present.
 
-    Hard-coding a number here rots: the mutation silently stops applying as
-    soon as that milestone is completed, and a mutation that cannot be applied
-    tests nothing while looking like a passing case. Selecting the *next*
-    pending one keeps the case meaningful for the whole project.
+    The earlier version flipped the lowest *pending* milestone, which stops
+    applying the moment the project finishes — and a mutation that cannot be
+    applied tests nothing while looking like a passing case (the same rot
+    ``m09``/``m03`` were fixed for). Selecting from the completed set keeps the
+    case meaningful before and after the last milestone lands.
     """
     import re as _re
 
@@ -147,26 +133,26 @@ def first_pending_milestone(work: Path) -> int:
         match = pattern.match(line)
         if not match:
             continue
+        milestone = int(match.group(1))
+        if milestone == 0:  # M0 is exempt from the handoff requirement
+            continue
         if "⬜" in line or "未开始" in line:
-            return int(match.group(1))
-    raise AssertionError("no pending milestone row found in plan/00 — nothing left to flip")
+            continue
+        if (work / f"plan/HANDOFF-M{milestone}.md").exists():
+            return milestone
+    raise AssertionError("no completed milestone with a handoff found in plan/00")
 
 
 def m04(work: Path) -> None:
-    """Mark a milestone completed in every copy while its handoff is absent.
+    """A completed milestone whose handoff is absent.
 
-    The handoff file is removed as well; otherwise the gate finds a valid
-    seven-section document and stays green, which would make this mutation a
-    no-op. (Flipping a milestone also lights up ``LAYOUT.GAPS``, because the gap
-    table still lists it — that is correct behaviour, and this case only asserts
-    that ``LAYOUT.HANDOFFS`` is among the reported failures.)
+    Removing the handoff of an already-completed milestone *is* that state: the
+    gate derives "done" from the status tables and then demands seven sections
+    from ``plan/HANDOFF-M<k>.md``. (Flipping a milestone instead would also light
+    ``LAYOUT.GAPS`` — correct, but this case only asserts ``LAYOUT.HANDOFFS``.)
     """
-    milestone = first_pending_milestone(work)
-    for rel in ("plan/00-README总览.md", "plan/05-里程碑与发布.md", "README.md"):
-        set_milestone_status(work, rel, milestone, "✅ 已完成")
-    handoff = work / f"plan/HANDOFF-M{milestone}.md"
-    if handoff.exists():
-        delete(handoff)
+    milestone = completed_milestone_with_handoff(work)
+    delete(work / f"plan/HANDOFF-M{milestone}.md")
 
 
 def m05(work: Path) -> None:
@@ -202,12 +188,29 @@ def m08(work: Path) -> None:
 
 
 def m09(work: Path) -> None:
-    """Leave the promise-evidence ledger with a stale pending marker."""
-    replace(
-        work / "plan/00-README总览.md",
-        "| ⬜ 待 M3 验证 |\n| 过期判定确定性",
-        "| ⬜ 待 M0 验证 |\n| 过期判定确定性",
+    """Leave the promise-evidence ledger with a stale pending marker.
+
+    Inserted, not substituted. The earlier version rewrote one existing row's
+    text, which tied the mutation to whatever that row happened to say — and
+    that row legitimately changed when its milestone landed, after which the
+    mutation could not apply (the self-test correctly reported "not red"). A
+    fresh row naming an already-completed milestone tests the gate itself rather
+    than the current contents of the document.
+    """
+    path = work / "plan/00-README总览.md"
+    lines = path.read_text(encoding="utf-8").split("\n")
+    header = next(
+        (
+            i
+            for i, line in enumerate(lines)
+            if line.startswith("|") and "承诺" in line and "状态" in line
+        ),
+        None,
     )
+    if header is None:
+        raise AssertionError("ledger table header not found")
+    lines.insert(header + 2, "| 变异行（自检注入） | — | — | ⬜ 待 M0 验证 |")
+    path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
 
 
 def m10(work: Path) -> None:

@@ -23,6 +23,7 @@ Thresholds come from the policy file only; there are no default literals here
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -59,6 +60,27 @@ PARSE_OK = "ok"
 UNREAD_FORMATS = frozenset({"pkcs7", "pem-pkcs7", "pkcs12", "jks", "jceks"})
 
 
+@dataclass(frozen=True, slots=True)
+class DecodedCandidate:
+    """A candidate together with the object the sniffer already decoded.
+
+    ``collect`` serialises candidates into plain dicts, which loses the decoded
+    certificate/key object. ``inventory`` needs those objects, and re-opening
+    every file to get them back would double the I/O and — worse — could read
+    *different* bytes the second time (a file replaced mid-run), producing a
+    ledger that disagrees with the candidate stream it claims to summarise.
+
+    So the decoded object is carried alongside, from the same read.
+    """
+
+    path: str
+    offset: int
+    source_kind: str
+    store_name: str | None
+    container_alias: str | None
+    item: Item
+
+
 def collect(
     *,
     roots: Iterable[str],
@@ -69,6 +91,32 @@ def collect(
     policy,
 ) -> dict:
     """Walk ``roots``/``files`` plus the system store; return the candidate stream."""
+    payload, _decoded = collect_with_items(
+        roots=roots,
+        files=files,
+        source=source,
+        follow_symlinks=follow_symlinks,
+        max_size=max_size,
+        policy=policy,
+    )
+    return payload
+
+
+def collect_with_items(
+    *,
+    roots: Iterable[str],
+    files: Iterable[str],
+    source: str,
+    follow_symlinks: bool | None,
+    max_size: int | None,
+    policy,
+) -> tuple[dict, list[DecodedCandidate]]:
+    """Same read as :func:`collect`, plus the decoded objects for ``inventory``.
+
+    One traversal, one pass over every file: the payload and the decoded list
+    describe the *same* reads, so a ledger cannot drift from the candidates it
+    was built from.
+    """
     if policy is None:
         raise CliError("策略缺失", "collect 需要已加载的策略文件（阈值不设代码默认值）")
 
@@ -89,12 +137,13 @@ def collect(
 
     candidates: list[dict] = []
     diagnostics: list[Diagnostic] = []
+    decoded: list[DecodedCandidate] = []
     scanned = 0
     read_failures = 0
 
     for candidate in walked.candidates:
         records, failures, opened = _scan_file(
-            candidate.path, sniff_window=sniff_window
+            candidate.path, sniff_window=sniff_window, sink=decoded
         )
         if opened:
             scanned += 1
@@ -109,7 +158,7 @@ def collect(
         diagnostics.append(Diagnostic(code=skip.code, path=skip.path, detail=skip.detail))
 
     store = read_store(source)
-    store_candidates, store_diagnostics = _scan_store(store)
+    store_candidates, store_diagnostics = _scan_store(store, sink=decoded)
     candidates.extend(store_candidates)
     diagnostics.extend(store_diagnostics)
 
@@ -133,13 +182,28 @@ def collect(
             diagnostics=ordered_diagnostics,
         ),
     }
-    return payload
+    ordered_decoded = sorted(decoded, key=_decoded_sort_key)
+    return payload, ordered_decoded
+
+
+def _decoded_sort_key(entry: DecodedCandidate) -> tuple:
+    return (
+        normalize_path(entry.path).casefold(),
+        normalize_path(entry.path),
+        entry.offset,
+        entry.source_kind,
+    )
 
 
 # ── one file ────────────────────────────────────────────────────────────────
 
 
-def _scan_file(path: str, *, sniff_window: int) -> tuple[list[dict], list[Diagnostic], bool]:
+def _scan_file(
+    path: str,
+    *,
+    sniff_window: int,
+    sink: list[DecodedCandidate] | None = None,
+) -> tuple[list[dict], list[Diagnostic], bool]:
     """Classify one file. Returns ``(candidates, diagnostics, opened)``.
 
     ``opened`` is False when the file could not be read at all — that is a skip,
@@ -195,6 +259,17 @@ def _scan_file(path: str, *, sniff_window: int) -> tuple[list[dict], list[Diagno
                 source_kind="file",
             )
         )
+        if sink is not None:
+            sink.append(
+                DecodedCandidate(
+                    path=path,
+                    offset=item.offset,
+                    source_kind="file",
+                    store_name=None,
+                    container_alias=None,
+                    item=item,
+                )
+            )
 
     for failure in result.failures:
         diagnostics.append(
@@ -263,7 +338,9 @@ def _candidate_sort_key(record: dict) -> tuple:
 # ── system store ────────────────────────────────────────────────────────────
 
 
-def _scan_store(store: StoreResult) -> tuple[list[dict], list[Diagnostic]]:
+def _scan_store(
+    store: StoreResult, *, sink: list[DecodedCandidate] | None = None
+) -> tuple[list[dict], list[Diagnostic]]:
     records: list[dict] = []
     diagnostics: list[Diagnostic] = []
 
@@ -282,6 +359,17 @@ def _scan_store(store: StoreResult) -> tuple[list[dict], list[Diagnostic]]:
                     container_alias=item.alias,
                 )
             )
+            if sink is not None:
+                sink.append(
+                    DecodedCandidate(
+                        path=f"store:{item.store_name}",
+                        offset=sniffed.offset,
+                        source_kind="store",
+                        store_name=item.store_name,
+                        container_alias=item.alias,
+                        item=sniffed,
+                    )
+                )
         for failure in result.failures:
             diagnostics.append(
                 Diagnostic(
@@ -392,9 +480,11 @@ def _summary(
 
 
 __all__ = [
+    "DecodedCandidate",
     "PARSE_FAILED",
     "PARSE_OK",
     "PARSE_UNSUPPORTED",
     "UNREAD_FORMATS",
     "collect",
+    "collect_with_items",
 ]

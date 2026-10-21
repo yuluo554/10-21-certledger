@@ -77,3 +77,29 @@ def parse_as_of(raw: str) -> AsOf:
 def add_days(seconds: int, days: int) -> int:
     """Add whole days in UTC (used for ``EXPIRING`` windows)."""
     return int((datetime.fromtimestamp(seconds, tz=timezone.utc) + timedelta(days=days)).timestamp())
+
+
+STAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+
+
+def format_stamp(seconds: int) -> str:
+    """Render integer seconds in the one format the ledger and truth file use."""
+    return format_utc(seconds)
+
+
+def parse_stamp(text: str) -> int | None:
+    """Parse a ledger timestamp back to seconds; ``None`` when it is not one.
+
+    The ledger stores ``%Y-%m-%dT%H:%M:%SZ`` (``inventory._stamp``), which sorts
+    lexicographically in time order — but comparisons against ``--as-of`` need
+    integer seconds, and comparing strings would silently depend on the exact
+    spelling. Returning ``None`` rather than raising keeps a single
+    unparseable record from aborting a whole run; the caller counts it.
+    """
+    if not text:
+        return None
+    try:
+        moment = datetime.strptime(text, STAMP_FORMAT).replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return None
+    return int(moment.timestamp())

@@ -64,6 +64,7 @@ _MISSING = object()
 #: docs cannot drift apart without a test noticing.
 REQUIRED_PATHS = (
     "policy_version",
+    "hygiene.expired.level",
     "hygiene.expiring.warn_days",
     "hygiene.cliff.window_days",
     "hygiene.cliff.min_count",
@@ -71,12 +72,47 @@ REQUIRED_PATHS = (
     "hygiene.weak_key.ec.allowed_curves",
     "hygiene.weak_sig.forbidden_digests",
     "hygiene.nist_2031.enabled",
+    "hygiene.nist_2031.bits",
+    "hygiene.private_key.level",
     "hygiene.permissions.max_posix_mode",
+    "hygiene.orphans.level",
+    "hygiene.duplicates.level",
+    "hygiene.container_truststore.level",
+    "hygiene.container_password.level",
+    "hygiene.diagnostics.default",
+    "hygiene.diagnostics.codes",
     "collect.max_file_bytes",
     "collect.sniff_bytes",
     "collect.follow_symlinks_default",
     "report.default_fail_on",
 )
+
+#: The only severities a rule may be set to, plus the switch that turns it off.
+LEVELS = ("ERROR", "WARN", "INFO", "off")
+
+#: The nine rule families of ``plan/03`` §③, by the policy block that owns them.
+#: Named here so ``hygiene`` can iterate and a deletion is a red test.
+RULE_BLOCKS = (
+    "hygiene.expired",
+    "hygiene.expiring",
+    "hygiene.cliff",
+    "hygiene.weak_key.rsa",
+    "hygiene.weak_key.ec",
+    "hygiene.weak_sig",
+    "hygiene.nist_2031",
+    "hygiene.private_key",
+    "hygiene.permissions",
+    "hygiene.orphans",
+    "hygiene.duplicates",
+    "hygiene.container_truststore",
+    "hygiene.container_password",
+)
+
+#: The failure-path block. It owns a *default* level plus a per-code override
+#: table, because the collector's code vocabulary is open (a new ``SKIP_*`` must
+#: not silently become an unclassified finding) while the severities must still
+#: be reviewable data rather than code.
+DIAGNOSTICS_BLOCK = "hygiene.diagnostics"
 
 
 def bundled_policy_path() -> Path:
@@ -121,8 +157,43 @@ def _validate(policy: Policy) -> None:
         _require_int(policy, dotted, minimum=0)
     _require_int(policy, "hygiene.cliff.min_count", minimum=1)
     _require_int(policy, "hygiene.weak_key.rsa.min_bits", minimum=1)
+    _require_int(policy, "hygiene.nist_2031.bits", minimum=1)
     _require_int(policy, "collect.max_file_bytes", minimum=1)
     _require_int(policy, "collect.sniff_bytes", minimum=16)
+
+    enabled = policy.require("hygiene.nist_2031.enabled")
+    if not isinstance(enabled, bool):
+        raise CliError("策略字段非法", "hygiene.nist_2031.enabled 必须是布尔值")
+
+    # Every rule carries its own severity or ``off``; an unknown word here would
+    # silently sort to the bottom of the report and never gate anything.
+    for block in RULE_BLOCKS:
+        level = policy.get(f"{block}.level", _MISSING)
+        if level is _MISSING:
+            continue
+        if level not in LEVELS:
+            raise CliError(
+                "策略字段非法",
+                f"{block}.level 必须是 {' / '.join(LEVELS)} 之一，收到 {level!r}",
+            )
+
+    diagnostics_default = policy.require(f"{DIAGNOSTICS_BLOCK}.default")
+    if diagnostics_default not in LEVELS:
+        raise CliError(
+            "策略字段非法",
+            f"{DIAGNOSTICS_BLOCK}.default 必须是 {' / '.join(LEVELS)} 之一，收到 {diagnostics_default!r}",
+        )
+    overrides = policy.require(f"{DIAGNOSTICS_BLOCK}.codes")
+    if not isinstance(overrides, dict):
+        raise CliError("策略字段非法", f"{DIAGNOSTICS_BLOCK}.codes 必须是对象")
+    for code, level in overrides.items():
+        if level not in LEVELS:
+            raise CliError(
+                "策略字段非法",
+                f"{DIAGNOSTICS_BLOCK}.codes.{code} 必须是 {' / '.join(LEVELS)} 之一，收到 {level!r}",
+            )
+
+    _require_octal_mode(policy, "hygiene.permissions.max_posix_mode")
 
     curves = policy.require("hygiene.weak_key.ec.allowed_curves")
     if not isinstance(curves, list) or not curves or not all(isinstance(c, str) for c in curves):
@@ -140,6 +211,18 @@ def _validate(policy: Policy) -> None:
         )
 
     _check_sources(policy)
+
+
+def _require_octal_mode(policy: Policy, dotted: str) -> str:
+    """A POSIX mode must be an octal *string* — ``640`` reads as decimal 640.
+
+    Storing it as a JSON number would make ``"640"`` and ``640`` mean different
+    things depending on who parses it; the string form is unambiguous.
+    """
+    value = policy.require(dotted)
+    if not isinstance(value, str) or not value or any(ch not in "01234567" for ch in value):
+        raise CliError("策略字段非法", f"{dotted} 必须是八进制数字组成的字符串，收到 {value!r}")
+    return value
 
 
 def _require_int(policy: Policy, dotted: str, *, minimum: int) -> int:
@@ -160,15 +243,7 @@ def _check_sources(policy: Policy) -> None:
     is semantically correct; the latter is a review item recorded in
     ``data/README.md`` §二.
     """
-    blocks = (
-        "hygiene.expiring",
-        "hygiene.cliff",
-        "hygiene.weak_key.rsa",
-        "hygiene.weak_key.ec",
-        "hygiene.weak_sig",
-        "hygiene.nist_2031",
-        "hygiene.permissions",
-    )
+    blocks = RULE_BLOCKS + (DIAGNOSTICS_BLOCK,)
     for block in blocks:
         source = policy.get(f"{block}.source")
         if not isinstance(source, str) or not source.strip():

@@ -200,7 +200,14 @@ def deterministic_rsa(seed: str, bits: int):
 
 
 def write_private_key(key, path: Path) -> None:
-    """Write a PKCS#8 PEM with no password (see the module docstring)."""
+    """Write a PKCS#8 PEM with no password (see the module docstring).
+
+    The file is left owner-only so the samples describe what a careful operator
+    does. With the default umask (022 → 0644) every sample key would report
+    ``PERMISSION_TOO_OPEN`` on POSIX and ``healthy`` would stop being healthy
+    for an accidental reason. The ``perm`` case sets its own loose mode *after*
+    calling this.
+    """
     from cryptography.hazmat.primitives import serialization
 
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -211,6 +218,10 @@ def write_private_key(key, path: Path) -> None:
             encryption_algorithm=serialization.NoEncryption(),
         )
     )
+    try:
+        os.chmod(path, 0o600)
+    except OSError:  # pragma: no cover - filesystems without POSIX modes
+        pass
 
 
 # ── certificates via OpenSSL ────────────────────────────────────────────────

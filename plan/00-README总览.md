@@ -12,9 +12,9 @@
 | 交付形态 | **纯本地 Python CLI**（唯一形态；零网络、零远程握手、零守护进程） |
 | 技术栈 | Python ≥ 3.10 · `cryptography` ≥ 42（解析底座）· `pytest`（dev）· 可选 JDK `keytool` |
 | 许可证 | MIT |
-| 版本 | v1 计划 · 2026-10-20 定稿；代码版本 `0.1.0.dev0`（`src/certledger/__init__.py` 单一来源） |
+| 版本 | v1 计划 · 2026-10-20 定稿；代码版本 `0.1.0`（`src/certledger/__init__.py` 单一来源，M6 定版） |
 | 检索/查证窗口 | **2026-10-19T18:35Z – 19:05Z**（星数、push 日期均为该窗口快照） |
-| 当前状态 | **M0 完成**：方法论装订 + plan/00–06 + 可运行骨架（五子命令参数面 / 策略加载 / 时间基准 / 记录模型）+ 两道门 |
+| 当前状态 | **M0–M6 全部完成**：骨架 → 采集器 → 台账 → 卫生规则 → 报告与容器 → 发布（v0.1.0）；两道门全绿 |
 
 ---
 
@@ -38,11 +38,11 @@
 | `pyproject.toml` | 构建配置（版本 `dynamic`，`[project.scripts] certledger`） | ✅ 已落盘 |
 | `MANIFEST.in` | 源码包白名单（tests/plan/data/tools/fixtures/CI 进 sdist） | ✅ 已落盘 |
 | `.gitattributes` | 源码 EOL 归一；证书类文件 `-text` | ✅ 已落盘 |
-| `src/certledger/` | CLI + 策略 + 时间基准 + 模型；五个分析模块为空壳（显式未实现） | ✅ 骨架 / ⬜ 分析层 |
-| `tests/` | CLI 面 / 策略 / 时间基准 / 模型 / 架构守门 / README 承诺 | ✅ 已落盘 |
+| `src/certledger/` | CLI + 策略 + 时间基准 + 模型 + 采集器 + 台账 + 卫生规则 + 报告渲染 + 容器；五子命令全部落地 | ✅ 已落盘 |
+| `tests/` | CLI 面 / 策略 / 时间基准 / 模型 / 架构守门 / README 承诺 / 真值 / 采集器 / 嗅探 / 台账 / DER 切片 | ✅ 已落盘 |
 | `fixtures/gen.sh` + `fixtures/gen.py` | 可复现样本生成脚本（shell 探测工具链 + Python 生成引擎；日期与序列号钉死） | ✅ 已落盘 |
-| `plan/HANDOFF-M<k>.md` | 逐棒交接单（七节）；`plan/HANDOFF-M1.md` 已落盘 | ✅ M1 交接单已落盘 |
-| `plan/RELEASE-M6.md` | 发布留档（tag 前入库；tag 后事实分栏追加） | ⬜ 待 M6 |
+| `plan/HANDOFF-M<k>.md` | 逐棒交接单（七节）；`plan/HANDOFF-M1.md`–`M6` 已落盘 | ✅ 交接单随里程碑滚动 |
+| `plan/RELEASE-M6.md` | 发布留档（tag 前入库；tag 后事实分栏追加） | ✅ 已落盘 |
 
 ---
 
@@ -100,14 +100,14 @@
 | 能力名词 | 哪条交付态命令产出它 | 哪条基准/测试断言它 |
 |---|---|---|
 | 证书台账（跨目录/容器/系统库合并） | `certledger inventory --roots <path> --json` 的 `certs[]` | `tests/test_inventory.py`：同一 DER 出现在 3 处 → 1 条记录、`sources` 长度 3 |
-| 私钥↔证书配对 | `certledger inventory` 的 `keys[].paired_cert_fingerprint` | `tests/test_pairing.py`：正确配对的 SPKI 相等；同 CN 不同密钥对不误配 |
+| 私钥↔证书配对 | `certledger inventory` 的 `keys[].paired_cert_fingerprint` | `tests/test_inventory.py`：正确配对的 SPKI 相等；同 CN 不同密钥对不误配（**M3 已落**） |
 | 孤儿（有证书无私钥 / 有私钥无证书） | `certledger hygiene` 的 `ORPHAN_CERT` / `ORPHAN_KEY` | `tests/test_hygiene.py`：孤儿样本命中、非孤儿不命中 |
 | 重复（同指纹多副本） | `certledger hygiene` 的 `DUPLICATE_CERT` / `DUPLICATE_KEY` | `tests/test_hygiene.py`：多副本样本 `sources` 长度 > 1 且 severity 正确 |
 | 过期 / 将过期（`--as-of` 驱动） | `certledger report --as-of <ts>` 的 `EXPIRED` / `EXPIRING` | `tests/test_asof.py`：同一 fixture 在 as-of=1900000000 与 as-of=1700000000 下结论不同；缺 `--as-of` 退出码 2（**M0 已落**：`tests/test_cli.py::test_missing_as_of_is_usage_error`） |
 | 到期扎堆（EXPIRY_CLIFF） | `certledger hygiene` 的 `EXPIRY_CLIFF` | `tests/test_hygiene.py`：窗口内 3 张 vs 窗口内 1 张，结论不同 |
 | 密钥强度（带出处、可配置） | `certledger hygiene` 的 `WEAK_KEY` / `WEAK_SIG` + `rule_source` 字段 | `tests/test_strength.py`：策略改阈值后 severity 翻转；`rule_source` 必含 CA/B 或 NIST 节号。**M0 已落**：`tests/test_policy.py::test_uncited_threshold_is_rejected` |
 | 私钥卫生（加密态 / 权限） | `certledger hygiene` 的 `PRIVATE_KEY_UNENCRYPTED` / `PERMISSION_TOO_OPEN` | `tests/test_hygiene.py`：644 私钥命中，600 不命中 |
-| 容器 alias 表（P12/JKS/JCEKS） | `certledger containers --show-aliases` | `tests/test_containers.py`：多别名样本列出全部 alias；无 JDK 环境降级为 `CONTAINER_UNREADABLE` |
+| 容器 alias 表（P12/JKS/JCEKS） | `certledger containers --show-aliases` | `tests/test_containers.py`（15 例）：多别名样本列出全部 alias 且 `same_fingerprint_aliases` 互相指认；JKS/JCEKS 用本机 JDK 26 `keytool` 真建真读；`KEYTOOL_ENV` 指向不存在路径 → 一条 `CONTAINER_UNREADABLE` 且退出 0 |
 | 确定性报告（字节级可复现） | `certledger report --as-of <ts> --json/--markdown` | `tests/test_determinism.py`：同输入调用两次，输出 sha256 相等。**M0 已落**：`tests/test_model.py::test_dump_json_is_byte_identical_across_calls` |
 | 快照 diff（新增/消失/轮换） | `certledger report --baseline prev.json` | `tests/test_baseline.py`：三类 diff 各一用例 |
 | 采集残差可见（不静默） | `certledger collect` 的 `SKIP_*` / `SOURCE_UNAVAILABLE` / `PARSE_FAILED` 记录 | `tests/test_collectors.py`：路径不可读、后端缺失、坏 DER 三种输入各产一条记录且退出码 0 |
@@ -125,6 +125,9 @@
 | 可复现样本生成 | `fixtures/gen.sh` | M1 | `bash fixtures/gen.sh --out fixtures/out && sha256sum fixtures/out/*` |
 | 依据与口径 | `data/README.md` | M0（骨架已有） | `git ls-files data/README.md` |
 | 确定性基准 | `tests/test_determinism.py` | M5 | `pytest -q tests/test_determinism.py` |
+| 快照 diff | `tests/test_baseline.py` | M5 | `pytest -q tests/test_baseline.py` |
+| 退出码契约 | `tests/test_exit_codes.py` | M5 | `pytest -q tests/test_exit_codes.py` |
+| 容器视图 | `tests/test_containers.py` | M5 | `pytest -q tests/test_containers.py` |
 | 计划文档套件 | `plan/00..06` | M0 | `py tools/check-sprint-layout.py` |
 | 方法论装订 | `AGENTS.md` + `tools/check-sprint-layout.py` + `tools/check-desensitized.py` | M0 | `py tools/selftest-gates.py` |
 | 发布三件套 | tag `v0.1.0` + Release 附产物 + `plan/RELEASE-M6.md` | M6 | `git tag -l` / `git cat-file -e v0.1.0:plan/RELEASE-M6.md` |
@@ -137,18 +140,29 @@
 | 承诺项 | 素材来源 | 当前证据 | 状态 |
 |---|---|---|---|
 | 方法论装订（锚点 + 两道门 + plan/00 一行） | `ai-tool-project-sprint` 硬约束③ | `AGENTS.md`、两道门、`tools/selftest-gates.py` 10+4 组变异 | ✅ 已实测 |
-| 五子命令参数面完整、退出码 2 语义正确 | `plan/02` §五 | `tests/test_cli.py`（17 例） | ✅ 已实测（M0） |
+| 五子命令参数面完整、退出码 2 语义正确 | `plan/02` §五 | `tests/test_cli.py`（24 例，含 `containers <path>` 不再 traceback 的回归） | ✅ 已实测（M0 / M3 补） |
 | 阈值零代码字面量 + 出处强制 | CA/B TLS BR v2.3.1 §6.1.5；NIST SP 800-131A Rev.2 | `src/certledger/data/default-policy.json` + `tests/test_policy.py` | ✅ 已实测（M0） |
 | `--as-of` 必填且唯一时间源 | RFC 5280 §4.1.2.5；本机 OpenSSL 实测 | `tests/test_timebase.py` + `tests/test_architecture.py::test_single_clock_source` | ✅ 已实测（M0） |
 | 零网络 | — | `tests/test_architecture.py::test_no_network_imports_anywhere` + 采集器模块级断言 `test_collectors_import_no_network_modules`（R9） | ✅ 已实测（M0/M2） |
 | 八类样本可一键重生成 + 真值可独立复算 | `plan/04` §1.1 / §二；OpenSSL 3.5.6 实测 `-not_before`/`-not_after`/`-set_serial` | `fixtures/gen.sh` + `fixtures/gen.py` + `fixtures/expected.json`；`tests/test_fixtures_truth.py`（39 例）；`gen.sh --determinism` 29 个文件字节全等 | ✅ 已实测（M1） |
-| 八类格式嗅探 + 多块 PEM 展开 + 遍历稳定 + 五种 SKIP | `plan/03` §①；RFC 7468；JKS/JCEKS 魔数本机实测（JDK 26） | `parsing/sniff.py` + `collectors/walker.py`；`tests/test_collectors.py`（51 例，含 `bundle` offset 0/1/2 与真值逐条对账）+ `tests/test_parsing.py`（32 例） | ✅ 已实测（M2） |
-| 证书/私钥/容器/系统库同表交叉引用 | 自建实现（无同类先例，见 `plan/01` §1.4） | 设计定稿于 `plan/03` §②；`model.py` 记录结构已落 | ⬜ 待 M3 验证 |
-| 私钥↔证书按 SPKI 配对 | RFC 5280 §4.2.1.2 SKI / SPKI 结构 | 决策 D8 已定口径；`model.py::KeyRecord.paired_cert_fingerprint` 字段已定 | ⬜ 待 M3 验证 |
-| 过期判定确定性（`--as-of`） | OpenSSL 3.5.6 实测 `verify -attime` 正确报 error 10 | `tests/test_timebase.py`（解析与边界）已落；判定本身待 M4 | ⬜ 待 M4 验证（解析已 ✅） |
+| 八类格式嗅探 + 多块 PEM 展开 + 遍历稳定 + 五种 SKIP | `plan/03` §①；RFC 7468；JKS/JCEKS 魔数本机实测（JDK 26） | `parsing/sniff.py` + `collectors/walker.py`；`tests/test_collectors.py`（52 例，含 `bundle` offset 0/1/2 与真值逐条对账）+ `tests/test_parsing.py`（31 例） | ✅ 已实测（M2） |
+| 证书/私钥/容器/系统库同表交叉引用 | 自建实现（无同类先例，见 `plan/01` §1.4） | `inventory.build()` 产出单一 `certs[]`/`keys[]`，`sources[].kind ∈ {file,container,store}`；`tests/test_inventory.py`（27 例，含"三处来源合并为一条"与"PEM/DER 同证书合一"） | ✅ 已实测（M3） |
+| 私钥↔证书按 SPKI 配对 | RFC 5280 §4.2.1.2 SKI / SPKI 结构 | `inventory._pair_certs` 只认 `spki_sha256`；`test_pair` / `test_same_cn` / `test_orphan` 三例钉住正反两面；配对键变异测试会变红 | ✅ 已实测（M3） |
+| 过期判定确定性（`--as-of`） | RFC 5280 §4.1.2.5；OpenSSL 3.5.6 实测 `verify -attime` 正确报 error 10 | `tests/test_asof.py`（7 例：同一 fixture 两个时刻结论不同、台账不随时刻移动）+ `tests/test_hygiene.py::test_not_after_equal_to_as_of_is_still_valid`（边界两侧）+ 17 用例逐条对账（13 条端到端一致，4 条见 `plan/05` §五）；判定本身不读 wall clock（`test_single_clock_source`） | ✅ 已实测（M4） |
+| 九类卫生规则 + 阈值/级别可配置 + 出处强制 | `plan/03` §③；`data/README.md` §五.2–§五.14 | `hygiene.evaluate`（九个 `_*_rules`）+ `tests/test_hygiene.py`（48 例）+ `tests/test_strength.py`（14 例）；9 组变异各打红对应用例（实测） | ✅ 已实测（M4） |
+| 失败路径进报告（"没找到"≠"没看"） | `plan/03` §⑥ | 每个台账诊断成一条 finding，级别在 `hygiene.diagnostics.codes` 逐码给定；未列出的码取同块 `default` | ✅ 已实测（M4） |
+| 双格式确定性报告（字节级可复现） | `plan/00` D9、`plan/03` §④ | `render/`：JSON 与 Markdown 由同一份内存文档渲染；`tests/test_determinism.py`（两次运行 JSON 与 Markdown 各比 sha256、键序、走查顺序无关、零外链、无时间戳/主机名） | ✅ 已实测（M5） |
+| 退出码 0/1/2 唯一出口 + `--fail-on none` 恒 0 | `data/README` §五.8；`plan/03` §④ | 1 号码只在 `render._exit_code` 产生；`tests/test_exit_codes.py`（0/1/2 + none 恒 0 + 降门槛翻转 + 不可写输出转 2 + `SOURCE_UNAVAILABLE` 不改码） | ✅ 已实测（M5） |
+| 快照 diff（新增 / 消失 / 轮换） | `plan/03` §④ | `render._diff_against`；按 `(subject_der_sha256, spki_sha256)` 配对，换密钥只算 removed+added；`tests/test_baseline.py`（三类各一例 + 换密钥不叫轮换 + 确定性） | ✅ 已实测（M5） |
+| 容器 contents 进同一张表（P12/JKS/JCEKS） | `plan/03` §⑤ | `containers.read_container` + `inventory._absorb_container`：容器内条目按指纹归并，`sources[].kind="container"` 带 `container_format`/`alias`/`entry_type`；三个容器用例逐条对上真值 | ✅ 已实测（M5） |
+| 无 JDK 降级不失败（可选外部依赖） | `plan/00` D2 / D11 | `find_keytool()` 找不到 → 一条 `CONTAINER_UNREADABLE`、退出 0；`tests/test_containers.py::test_no_jdk_degrades_to_unreadable_and_still_exits_zero` | ✅ 已实测（M5） |
+| 口令不进 `argv` / 不落盘 / 不进报告 | `plan/02` §七 | `keytool -storepass:env`；`tests/test_containers.py::test_the_password_never_reaches_a_child_process_argv`（抓真实 argv）+ `test_the_password_is_not_in_the_document` | ✅ 已实测（M5） |
+| 报告绝对路径默认打码 | `plan/00` D9；`plan/02` §六 | `render/redact.py` **按路径形态**判断（盘符 / UNC / 正斜杠），保留 basename；两位格式同一遍打码 | ✅ 已实测（M5） |
+| 「未落地能力」语义退役（无幽灵退出码） | `plan/06` G1；`plan/02` §五 | 五个子命令全部落地；全仓再无 `raise NotImplementedError`；CLI 断言逐子命令不答"尚未落地" | ✅ 已实测（M5） |
+| `--top` 不构成门禁后门 | `plan/03` §③ 过期表 | 只裁 `expiries` 展示表；`findings` 全集与退出码不变（`test_determinism.py::test_top_trims_the_expiry_table_only` 同时断两侧） | ✅ 已实测（M5） |
 | P12 可造可读 | OpenSSL 3.5.6 `pkcs12 -export/-info`（MAC=sha256、PBES2/AES-256-CBC） | 本机实测 | ✅ 已实测 |
 | JKS 构建与解析可行 | JDK 26 `keytool` 可建 JKS；`cacerts` 实测为 PKCS12、150 条 trustedCertEntry | 本机实测（2026-10-20 复测 JDK 26） | ✅ 已实测 |
-| JKS 解析无停更依赖风险 | pyjks 136★，2024-02-19 停更 | 决策 D2：MVP 走 keytool | ⬜ 待 M5 验证 |
+| JKS 解析无停更依赖风险 | pyjks 136★，2024-02-19 停更 | 决策 D2：走 keytool。**M5 已落地并本机真跑**：JDK 26 `keytool -list -v` 按标签解析 + 逐条 `-exportcert` 取证书；`-storepass:env` 让口令不进 `argv` | ✅ 已实测（M5） |
 | Windows 后端可读 | `certutil -split -store` 汇总 **81** 张：Root=18、AuthRoot=58、CA=5、My=0（`Cert:\LocalMachine\Root` 视图为 76 = Root 18 + AuthRoot 58，二者有 4 张重叠）。**`certutil -store Root` 单读只看到 18 张，比合并视图少 58 张**——只读 Root 会静默漏报 | 本机实测（2026-10-21，M2）；`tests/test_collectors.py::test_windows_root_view_includes_authroot` 钉住 | ✅ 已实测（M2） |
 | Windows 后端不使用 storeutl | `openssl storeutl 'org.openssl.winstore:'` 返回空 | 本机实测（否定结论） | ✅ 已实测 |
 | Linux 后端可读 | `/etc/ssl/certs/ca-certificates.crt` + p11-kit `trust list` | 读取与 PEM 拆分路径已用真实 bundle 实测（`test_linux_backend_reads_a_real_pem_bundle`）；**本机无该文件，真实路径未复测** | 🟡 代码路径已验，真实路径待 Linux 机器 |
@@ -166,10 +180,10 @@
 | **M0 骨架** | 方法论装订（`AGENTS.md` + 两道门 + `plan/00` 一行）+ `plan/00–06` + 可运行骨架（五子命令参数面 / 策略加载 / 时间基准 / 记录模型）+ CI workflow | 两道门全绿且 14 组变异全红；`pytest` 全绿；`--help` / `--version` 退出 0；非法参数退出 2；未落地能力不伪造空结果 | ✅ 已完成 |
 | **M1 数据先行** | `fixtures/gen.sh` 造八类样本：健康 / 将过期 / 已过期 / 弱密钥 / 弱签名 / 多别名 / truststore 混私钥 / 孤儿私钥；样本真值 | 样本可由脚本一键重生成；日期与序列号钉死（`-not_before` / `-not_after` / `-set_serial`）；`expected.json` 只存输入与期望；**真实证书与私钥零入库** | ✅ 已完成（2026-10-21） |
 | **M2 采集器** | `collectors`：递归遍历 + 内容嗅探（PEM/DER/PKCS#7/PKCS#12/JKS/JCEKS/PKCS#8/OpenSSH 公钥）+ 三平台后端可插拔 + 降级记录 | 八类格式均能识别；后端缺失产 `SOURCE_UNAVAILABLE` 且退出码 0；遍历顺序稳定；跳过的文件带原因码 | ✅ 已完成（2026-10-21） |
-| **M3 台账** | `inventory`：统一记录模型 + 双指纹 + `sources[]` 合并 + SPKI 配对 | 同证书三处来源合并为一条；同 CN 不同密钥对不被误配；JSON 键序稳定 | ⬜ 未开始 |
-| **M4 卫生规则** | `hygiene`：九类 finding + 策略文件（阈值带出处）+ `--as-of` 必填 | 每条规则有出处的 `rule_source`；无出处阈值不得生效；策略缺失报错退出 2 | ⬜ 未开始 |
-| **M5 报告与容器** | `report`（JSON+Markdown、退出码、`--fail-on`、`--baseline`）+ `containers`（keytool 路线 + 降级） | 两次运行字节级相同；三类 diff 可复现；无 JDK 时容器降级不失败 | ⬜ 未开始 |
-| **M6 发布** | 公开仓库发布 | **DoD 三件套**：**git tag** + **GitHub Release（附产物）** + **发布留档 `plan/RELEASE-M6.md`**；README 首屏差异句在位；`plan/00` 台账状态逐项翻转 | ⬜ 未开始 |
+| **M3 台账** | `inventory`：统一记录模型 + 双指纹 + `sources[]` 合并 + SPKI 配对 | 同证书三处来源合并为一条；同 CN 不同密钥对不被误配；JSON 键序稳定 | ✅ 已完成（2026-10-21） |
+| **M4 卫生规则** | `hygiene`：九类 finding + 策略文件（阈值与级别带出处）+ `--as-of` 必填 + 失败路径成 finding | 每条规则有出处的 `rule_source`；无出处阈值不得生效；策略缺失报错退出 2；`EXPIRY_CLIFF` 按去重指纹计数；改阈值/级别可翻转结论 | ✅ 已完成（2026-10-21） |
+| **M5 报告与容器** | `report`（JSON+Markdown、退出码、`--fail-on`、`--baseline`、`--top`、绝对路径打码）+ `containers`（keytool 路线 + 降级）+ 容器内容归并进台账 | 两次运行字节级相同（JSON 与 Markdown 各比 sha256）；三类 diff 可复现；`--top` 只影响展示（findings 与退出码不变）；无 JDK 时容器降级为 `CONTAINER_UNREADABLE` 且退出 0；`render/` 零判定、Markdown 零外链 | ✅ 已完成（2026-10-21） |
+| **M6 发布** | 公开仓库发布 | **DoD 三件套**：**git tag** + **GitHub Release（附产物）** + **发布留档 `plan/RELEASE-M6.md`**；README 首屏差异句在位；`plan/00` 台账状态逐项翻转 | ✅ 已完成（2026-10-21） |
 
 > **发布口径（A 方案，写死）**：M6 的 "Release 附产物" = 至少一个手工上传附件（源码包或 sdist），
 > **本地留副本 + sha256 留档**，不用"源码 zipball 即产物"（B 方案）替代。

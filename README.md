@@ -12,7 +12,7 @@ you have, which key pairs with which, and which nobody owns is the one that is s
 > talks to a remote service, and never writes a host name or a user name into a report. Real
 > certificates and private keys never enter this repository.
 
-`Status: v0.1.0.dev0 — skeleton (command surface only)`
+`Status: v0.1.0 — collect, inventory, hygiene, report and containers all landed`
 
 ---
 
@@ -40,9 +40,9 @@ failing.
 
 ## Usage
 
-> The analysis modules are not wired up in this version. Every command parses and validates its
-> arguments and exits `2` with a plain "not available in this version" message instead of printing
-> an empty ledger. `--help` and `--version` work fully.
+> Every command is live. Containers are read through `cryptography` (PKCS#12) or the JDK's own
+> `keytool` (JKS / JCEKS) — and `keytool` is **optional**: with no JDK, a store degrades to one
+> `CONTAINER_UNREADABLE` record and the process still exits `0`.
 
 ```bash
 # Scan a directory tree plus the system trust store
@@ -60,10 +60,20 @@ certledger report --inventory ledger.json --as-of 2030-03-17T17:46:40Z \
 
 # Diff against the previous snapshot
 certledger report --inventory ledger.json --as-of 1900000000 --baseline prev.json
+
+# Aliases and container-level signals for one or more stores
+certledger containers ./pki/keystore.jks --show-aliases
 ```
 
 `--as-of` is mandatory on every time-sensitive command and accepts Unix seconds or ISO-8601 with an
 explicit offset. The report echoes it back verbatim.
+
+A container's password is read from one environment variable and never from the command line:
+`CERTLEDGER_CONTAINER_PASSWORD`, or the variable `--password-env` names. An empty-password store
+opens without it and is reported as `CONTAINER_EMPTY_PASSWORD`.
+
+By default the report masks the directory part of absolute paths (`<redacted>/server.pem`); pass
+`--no-redact` to print them as they are.
 
 ## Exit codes
 
@@ -72,6 +82,9 @@ explicit offset. The report echoes it back verbatim.
 | `0` | nothing reached the `--fail-on` threshold (default `ERROR`) |
 | `1` | at least one finding reached the threshold |
 | `2` | input, policy or argument error (missing `--as-of`, unreadable policy, bad path) |
+
+`--fail-on none` turns the gate off and always exits `0` — every finding is still rendered. There is
+no third code: an unfinished capability never gets one, it produces a visible record instead.
 
 A missing system backend does **not** change the exit code: it produces a `SOURCE_UNAVAILABLE`
 record, because "not looked at" and "nothing there" are different answers.
@@ -100,6 +113,13 @@ CA/B Forum TLS BR v2.3.1 §6.1.5 and NIST SP 800-131A Rev. 2.
 No chain verification, no revocation checking, no remote TLS scanning, no SBOM/CBOM output, no
 daemon, no alerting, no web UI. See `plan/01-题目文档.md` §六 for the reasoning behind each boundary.
 
+Two backends are honest gaps rather than features: the **macOS** system-store backend has never been
+run on a real machine, so it always returns `SOURCE_UNAVAILABLE` and is flagged `unverified_backend`
+— it is deliberately not listed as a capability; and the Linux backend's real path
+(`/etc/ssl/certs/ca-certificates.crt`) was only exercised by injecting a bundle on this machine.
+Non-JDK container formats (BKS, UBER) are likewise unverified and degrade to a
+`CONTAINER_UNREADABLE` record.
+
 ## Development
 
 ```bash
@@ -119,10 +139,10 @@ py -3.12 -m pytest -q
 | M0 | 方法论装订 + 计划套件 + 可运行骨架 | ✅ 已完成 |
 | M1 | 数据先行：样本生成器 + 八类样本 + 真值 | ✅ 已完成 |
 | M2 | 采集器：遍历 + 嗅探 + 后端 + 降级 | ✅ 已完成 |
-| M3 | 归一化台账：合并 + 双指纹 + SPKI 配对 | ⬜ 未开始 |
-| M4 | 卫生规则：九类 finding + 策略 | ⬜ 未开始 |
-| M5 | 报告 + 容器：双格式 + 退出码 + baseline | ⬜ 未开始 |
-| M6 | 发布：tag + Release + 留档 | ⬜ 未开始 |
+| M3 | 归一化台账：合并 + 双指纹 + SPKI 配对 | ✅ 已完成 |
+| M4 | 卫生规则：九类 finding + 策略 | ✅ 已完成 |
+| M5 | 报告 + 容器：双格式 + 退出码 + baseline | ✅ 已完成 |
+| M6 | 发布：tag + Release + 留档 | ✅ 已完成 |
 
 > 状态行只写"版本 + 能力"。是否已发布、CI 是否绿，以 Release 页与 `plan/` 为准——
 > 随包读者手里没有 Release 页，不该靠这一行判断发布状态。

@@ -133,40 +133,82 @@ def test_installed_metadata_matches_module() -> None:
     assert installed == __version__
 
 
-def test_shells_raise_instead_of_returning_empty() -> None:
-    """An empty result is a confident wrong answer (plan/06 R8).
+def test_no_module_still_refuses_to_answer() -> None:
+    """The shell era is over: nothing raises ``NotImplementedError`` any more.
 
-    ``collectors.collect`` is no longer a shell — it returns a counted structure,
-    including for an empty tree — so it moved out of this assertion and into
-    :func:`test_collector_returns_counts_instead_of_raising`. Keeping the
-    positive half as a test means "returns counts" is a claim something checks,
-    not merely a claim the shell test stopped making.
+    The rule this replaces was "a shell never answers with an empty document"
+    (plan/06 R8). Every stage has since landed, so the rule is now asserted in
+    the form it took on: no ``raise NotImplementedError`` survives anywhere in
+    the package. ``cli.main`` still *catches* it — that is a net under a future
+    stage added to the surface before it is implemented — so the check is on the
+    ``raise`` statement, not on the name.
     """
-    from certledger import containers, hygiene, inventory, render
+    offenders: list[str] = []
+    files = module_files()
+    assert len(files) >= 8, f"only scanned {len(files)} modules — the gate is vacuous"
+    for path in files:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Raise):
+                continue
+            target = node.exc
+            name = getattr(target, "id", None) or getattr(getattr(target, "func", None), "id", None)
+            if name == "NotImplementedError":
+                offenders.append(f"{path.relative_to(SRC.parent.parent)}:{node.lineno}")
+    assert offenders == [], offenders
 
-    with pytest.raises(NotImplementedError):
-        inventory.build(roots=[], files=[], source="none", follow_symlinks=False, policy=None)
-    with pytest.raises(NotImplementedError):
-        hygiene.evaluate(
-            roots=[], files=[], inventory_path=None, as_of=None, policy=None, source="none"
-        )
-    with pytest.raises(NotImplementedError):
-        containers.inspect(paths=[], show_aliases=False, password_env=None, policy=None, json_path=None)
-    with pytest.raises(NotImplementedError):
-        render.render(
-            roots=[],
-            files=[],
-            inventory_path=None,
-            as_of=None,
-            policy=None,
-            json_path=None,
-            markdown_path=None,
-            baseline=None,
-            fail_on=None,
-            top=None,
-            redact=True,
-            source="none",
-        )
+
+def test_every_stage_answers_instead_of_raising(tmp_path) -> None:
+    """The positive half of the retired shell rule, for every stage at once.
+
+    Each entry point must return a *document*, over an empty tree, rather than an
+    exception or ``None``. "Nothing here" is an answer about the tree, and it is
+    only trustworthy because it comes with counters proving the tree was walked.
+    """
+    from certledger.containers import read_container
+    from certledger.inventory import build
+    from certledger.policy.loader import load_policy
+    from certledger.render import render
+
+    policy = load_policy()
+
+    # containers: a path that is not a container yields a record, not a raise.
+    plain = tmp_path / "notes.txt"
+    plain.write_text("not a container\n", encoding="utf-8")
+    reading = read_container(str(plain))
+    assert reading.unreadable, reading
+    assert reading.format == "unknown"
+
+    # render: handed a findings document, it renders and returns an exit code.
+    ledger = build(roots=[str(tmp_path)], files=[], source="none", follow_symlinks=False, policy=policy)
+    exit_code = render(
+        findings_document={
+            "kind": "hygiene",
+            "as_of": "1900000000",
+            "as_of_utc": "2030-03-17T17:46:40Z",
+            "policy_version": policy.version,
+            "policy_sha256": policy.sha256,
+            "findings": [],
+            "summary": {
+                "records": {"certs": 0, "keys": 0, "diagnostics": 0},
+                "findings": 0,
+                "by_severity": {"ERROR": 0, "WARN": 0, "INFO": 0},
+                "suppressed": 0,
+                "suppressed_by_code": {},
+            },
+        },
+        ledger=ledger,
+        policy=policy,
+        fail_on=None,
+        top=None,
+        redact=True,
+        json_path=str(tmp_path / "report.json"),
+        markdown_path=str(tmp_path / "report.md"),
+        baseline=None,
+    )
+    assert exit_code == 0
+    assert (tmp_path / "report.json").is_file()
+    assert (tmp_path / "report.md").is_file()
 
 
 def test_collector_returns_counts_instead_of_raising(tmp_path) -> None:
@@ -190,9 +232,63 @@ def test_collector_returns_counts_instead_of_raising(tmp_path) -> None:
     assert summary["visited"] == summary["scanned"] + summary["skipped"]
 
 
+def test_inventory_returns_a_ledger_instead_of_raising(tmp_path) -> None:
+    """The positive half of the shell rule, for the second module that landed.
+
+    An empty tree must produce an *empty ledger with counters*, not an exception
+    and not ``None``: "0 certificates, 0 files visited" is a statement about the
+    tree, and it is only trustworthy because the walk counters prove the walk
+    happened.
+    """
+    from certledger.inventory import build
+    from certledger.policy.loader import load_policy
+
+    payload = build(
+        roots=[str(tmp_path)],
+        files=[],
+        source="none",
+        follow_symlinks=False,
+        policy=load_policy(),
+    )
+    assert payload["kind"] == "inventory"
+    assert payload["certs"] == []
+    assert payload["keys"] == []
+    assert payload["diagnostics"] == []
+    for key in ("certs", "keys", "cert_sources", "key_sources", "paired_keys", "collect"):
+        assert key in payload["summary"], key
+    assert payload["summary"]["collect"]["visited"] == 0
+
+
+def test_hygiene_returns_findings_instead_of_raising(tmp_path) -> None:
+    """The positive half of the shell rule, for the third module that landed.
+
+    An empty tree must produce a *findings document with counters*, not an
+    exception and not ``None``. The document also echoes the instant it was
+    judged against, because a report with no ``--as-of`` cannot be reproduced —
+    the whole reason the flag is mandatory.
+    """
+    from certledger.hygiene import evaluate
+    from certledger.policy.loader import load_policy
+    from certledger.timebase import parse_as_of
+
+    payload = evaluate(
+        roots=[str(tmp_path)],
+        files=[],
+        inventory_path=None,
+        as_of=parse_as_of("1900000000"),
+        policy=load_policy(),
+        source="none",
+    )
+    assert payload["kind"] == "hygiene"
+    assert payload["findings"] == []
+    assert payload["as_of"] == "1900000000"
+    assert payload["as_of_utc"] == "2030-03-17T17:46:40Z"
+    assert payload["summary"]["findings"] == 0
+    assert payload["summary"]["records"]["certs"] == 0
+
+
 def test_collectors_import_no_network_modules() -> None:
     """Module-scoped version of the global gate, pinned to the collector (R9).
-
     The global check would still pass if the collector grew a helper in another
     package that imported ``socket``. This one asserts the property where it
     matters most: the module that touches the filesystem and subprocesses is

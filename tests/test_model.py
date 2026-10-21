@@ -31,6 +31,26 @@ def test_cert_key_order_is_declared_not_alphabetical() -> None:
     assert keys[-1] == "sources"
 
 
+def test_name_fields_carry_display_and_der_hash() -> None:
+    """``subject``/``issuer`` are ``{display, der_sha256}`` (plan/03 §②).
+
+    The pair matters: the display string is what a human reads, the DER hash is
+    what identifies the name. Storing only the string would make two names that
+    render alike indistinguishable.
+    """
+    cert = CertRecord(
+        fingerprint_sha256="aa",
+        spki_sha256="bb",
+        subject="CN=a",
+        issuer="CN=root",
+        subject_der_sha256="s" * 64,
+        issuer_der_sha256="i" * 64,
+    ).to_dict()
+    assert cert["subject"] == {"display": "CN=a", "der_sha256": "s" * 64}
+    assert cert["issuer"] == {"display": "CN=root", "der_sha256": "i" * 64}
+    assert list(cert["subject"]) == ["display", "der_sha256"]
+
+
 def test_sources_are_sorted_by_kind_then_path_then_alias() -> None:
     cert = CertRecord(
         fingerprint_sha256="aa",

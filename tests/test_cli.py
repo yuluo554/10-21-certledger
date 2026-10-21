@@ -1,12 +1,14 @@
 """CLI surface: argument parsing, help, exit codes.
 
-M0 asserts the *surface* is complete and honest. It does not assert that the
-analysis produces anything — the modules are shells on purpose (plan/03 §M0).
+Every subcommand is live, so the assertions here are about the *surface*: which
+arguments parse, which inputs are refused before any work happens, and that the
+documented exit codes 0/1/2 are the only ones produced.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 
@@ -92,19 +94,82 @@ def test_naive_as_of_is_rejected() -> None:
     assert "时区" in err
 
 
-def test_unimplemented_module_exits_two_without_claiming_success() -> None:
-    """``inventory`` is still a shell: it must not fabricate an empty ledger."""
-    code, out, err = run_cli("inventory", "--roots", ".")
-    assert code == EXIT_USAGE
-    assert out == ""  # no fabricated empty result on stdout
-    assert "尚未" in err
+@pytest.mark.parametrize("command", ["collect", "inventory", "hygiene", "report"])
+def test_no_command_claims_an_unimplemented_capability(command: str, tmp_path) -> None:
+    """The "not available in this version" answer has no reachable trigger (K7).
+
+    ``report`` used to be the last analysis shell, so the K7 assertion pointed at
+    it. Every stage has landed, so the rule is stated in the form it can still
+    take: a subcommand run against real (if empty) input never produces the
+    unimplemented-capability sentence and never exits with a code outside the
+    documented set. The sentence and its branch stay in ``cli.main`` as a net
+    under a stage that is added to the surface before it is implemented.
+    """
+    argv = [command, "--roots", str(tmp_path), "--source", "none"]
+    if command in ("hygiene", "report"):
+        argv += ["--as-of", "1900000000"]
+    code, out, err = run_cli(*argv)
+    assert code in (0, 1, 2), (command, code, err)
+    assert "尚未" not in err, err
+    assert "Traceback" not in err, err
+    assert out != "", "a landed command must answer with a document"
 
 
-def test_unimplemented_message_cites_no_internal_milestone() -> None:
-    """User-facing text must not reference internal plan numbers (plan/06 R7)."""
-    code, _, err = run_cli("inventory", "--roots", ".")
+def test_report_answers_with_a_report_document(tmp_path) -> None:
+    """The last stage to land answers with its own document kind."""
+    code, out, err = run_cli(
+        "report", "--roots", str(tmp_path), "--source", "none", "--as-of", "1900000000"
+    )
+    assert code == 0, err
+    payload = json.loads(out)
+    assert payload["kind"] == "report"
+    assert payload["as_of"] == "1900000000"
+    assert payload["as_of_utc"] == "2030-03-17T17:46:40Z"
+    assert payload["findings"] == []
+    assert payload["tool_version"] == __version__
+
+
+def test_hygiene_answers_instead_of_claiming_unimplemented(tmp_path) -> None:
+    """The other half of the same rule, for the module that landed this time.
+
+    An empty tree is used on purpose: a text file would legitimately produce a
+    ``SKIP_UNKNOWN_FORMAT`` finding, and this test is about "the command
+    answers", not about the rule set.
+    """
+    code, out, err = run_cli(
+        "hygiene", "--roots", str(tmp_path), "--source", "none", "--as-of", "1900000000"
+    )
+    assert code == 0, err
+    payload = json.loads(out)
+    assert payload["kind"] == "hygiene"
+    assert payload["findings"] == []
+    assert payload["as_of_utc"] == "2030-03-17T17:46:40Z"
+
+
+def test_inventory_answers_instead_of_claiming_unimplemented(tmp_path) -> None:
+    """The other half of the same rule: the landed module answers, exit 0."""
+    (tmp_path / "notes.txt").write_text("not a certificate\n", encoding="utf-8")
+    code, out, err = run_cli("inventory", "--roots", str(tmp_path), "--source", "none")
+    assert code == 0, err
+    payload = json.loads(out)
+    assert payload["kind"] == "inventory"
+    assert payload["certs"] == []
+    assert payload["summary"]["collect"]["visited"] == 1
+
+
+def test_error_text_cites_no_internal_milestone(tmp_path) -> None:
+    """User-facing text must not reference internal plan numbers (plan/06 R7).
+
+    Checked on a real error path (a policy file that is not there) rather than on
+    a shell message, because the rule is about every sentence the tool prints,
+    not about the one that happened to exist when the rule was written.
+    """
+    code, _, err = run_cli(
+        "report", "--roots", ".", "--as-of", "1900000000", "--policy", str(tmp_path / "nope.json")
+    )
     assert code == EXIT_USAGE
-    assert "M1" not in err and "M2" not in err and "M3" not in err
+    assert "策略文件" in err
+    assert not re.search(r"\bM[0-9]\b", err), err
 
 
 def test_collect_runs_and_reports_counts(tmp_path) -> None:
@@ -147,6 +212,22 @@ def test_containers_requires_a_path() -> None:
     code, _, err = run_cli("containers")
     assert code == EXIT_USAGE
     assert "PATH" in err or "required" in err
+
+
+def test_containers_with_a_path_exits_two_without_a_traceback() -> None:
+    """Regression: ``--policy`` alone must not demand ``--roots``.
+
+    ``containers`` takes positional paths and its own ``--policy``. An earlier
+    validation gate keyed on "does this command have a policy argument" sent it
+    into the ``--roots``-required branch, where ``args.roots`` did not exist:
+    the command died with an ``AttributeError`` traceback and exit code 1. The
+    documented contract is 0/1/2 only, and a traceback is none of them.
+    """
+    code, out, err = run_cli("containers", "some.p12")
+    assert code == EXIT_USAGE, (code, err)
+    assert out == ""
+    assert "Traceback" not in err
+    assert "AttributeError" not in err
 
 
 def test_parser_accepts_documented_multi_value_forms() -> None:

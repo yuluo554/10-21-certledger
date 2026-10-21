@@ -1,7 +1,11 @@
 {
-  "policy_version": "1.0.0",
-  "note": "Thresholds and their citations. Single definition point; see data/README.md section 5. Code must not hard-code any of these values.",
+  "policy_version": "1.1.0",
+  "note": "Thresholds, severities and their citations. Single definition point; see data/README.md section 5. Code must not hard-code any of these values. `level` is one of ERROR / WARN / INFO / off; `off` suppresses findings but the suppression is still counted in the report summary.",
   "hygiene": {
+    "expired": {
+      "level": "ERROR",
+      "source": "RFC 5280 4.1.2.5 (Validity): notAfter strictly before the as-of instant; boundary per data/README.md section 5.2"
+    },
     "expiring": {
       "warn_days": 30,
       "level": "WARN",
@@ -32,13 +36,45 @@
     },
     "nist_2031": {
       "enabled": false,
+      "bits": 2048,
       "level": "INFO",
+      "statement": "按 NIST 时间表，2031 年起不再允许用于施加保护（当前仍属可接受使用）。",
       "source": "NIST SP 800-57 Part 1 Rev.5 Table 2 / Table 4; SP 800-131A Rev.2 section 1.1"
+    },
+    "private_key": {
+      "level": "WARN",
+      "source": "本项目定义（data/README.md 5.5）：私钥可无口令解析成功即为未加密"
     },
     "permissions": {
       "max_posix_mode": "640",
       "level": "WARN",
       "source": "本项目定义（data/README.md 5.5）：POSIX mode 不得含 o+r 或 g+r"
+    },
+    "orphans": {
+      "level": "INFO",
+      "source": "本项目定义（data/README.md 5.6）：spki_sha256 在另一侧无对应记录即为孤儿"
+    },
+    "duplicates": {
+      "level": "INFO",
+      "source": "本项目定义（data/README.md 5.7）：同指纹 sources 长度 > 1 即为多副本"
+    },
+    "container_truststore": {
+      "level": "WARN",
+      "source": "本项目定义（data/README.md 5.15）：truststore 中出现私钥条目"
+    },
+    "container_password": {
+      "level": "INFO",
+      "source": "本项目定义（data/README.md 5.15）：容器可用空口令打开"
+    },
+    "diagnostics": {
+      "default": "INFO",
+      "codes": {
+        "PARSE_FAILED": "WARN",
+        "PARSE_UNSUPPORTED": "INFO",
+        "CONTAINER_UNREADABLE": "WARN",
+        "SOURCE_UNAVAILABLE": "INFO"
+      },
+      "source": "本项目定义（data/README.md 5.10）：失败路径分级（plan/03 ⑥ 一张表一物一码）"
     }
   },
   "collect": {
