@@ -184,12 +184,13 @@ CA/B Forum BR 时间表（BR.md 日期表 + §6.3.2 原文核对）：
 
 ### 4.1 生成器与可复现性
 
-- 唯一生成入口：`fixtures/gen.sh`（OpenSSL ≥ 3.0 + JDK `keytool`，可选）。
-- **日期钉死**：所有证书用 `openssl ca -startdate` / `-enddate` 指定（固定基准日 + 固定偏移），**不使用相对当前时刻的默认值**。
-  用 `ca` 而不是 `req -x509` 的理由：`req` 的 `-not_before/-not_after` 要到 **OpenSSL 3.5** 才有，
-  而 CI 的发行版镜像多为 3.0——那条路会让样本只能在装了 3.5 的机器上生成（M6 首推实测）。
-  `ca` 同时能签 SHA-1 证书，而 `cryptography` 50 拒绝用 SHA-1 签名，`weak-sig` 样本因此只能走 `ca`。
-- **序列号钉死**：`openssl ca` 的序列号来自其数据库（写死初值），保证同参数多次运行产出**同指纹**证书。
+- 唯一生成入口：`fixtures/gen.sh`（`cryptography` 签证书；OpenSSL ≥ 3.0 仅用于空口令 PKCS#12 导出与版本记录；JDK `keytool` 可选）。
+- **日期钉死**：所有证书由 `cryptography` 的 `CertificateBuilder` 指定 `not_valid_before` / `not_valid_after`（固定基准日 + 固定偏移），**不使用相对当前时刻的默认值**。
+  不走 `openssl` CLI 签名的理由（M6 首推实测）：`req -x509` 的 `-not_before/-not_after` 要到 **OpenSSL 3.5** 才有，
+  而 CI 的发行版镜像多为 3.0；改用 `ca -startdate/-enddate` 虽能跑，但**同一输入在 3.0 与 3.5 上产出不同 DER**，
+  真值文件里的指纹随平台漂移。`cryptography` 自己编码 TBS，跨平台字节一致。
+  (`weak-sig` 需要的 SHA-1 证书由原语级签名 + 手工拼装 DER 产出——`cryptography` 50 拒绝 SHA-1 的 builder 签名。)
+- **序列号钉死**：显式传给 `CertificateBuilder`，保证同参数多次运行产出**同指纹**证书。
 - 生成参数写入 `fixtures/out/manifest.json`（每项：文件名 / 格式 / 期望结论 / 生成命令）。
 - 允许的例外：PKCS#12 的 salt 与迭代随机化、JKS 容器的时间戳字段会导致**容器文件字节**不可复现——因此**基线比对的对象是台账 JSON，不是容器文件字节**（口径见 §4.4）。
 

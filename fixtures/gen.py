@@ -21,8 +21,9 @@ drift apart.
 
 Reproducibility rules this file is written to satisfy:
 
-* every certificate is signed by ``openssl ca`` with pinned ``-startdate`` /
-  ``-enddate`` and a pinned serial — two runs produce byte-identical files;
+* every certificate is built by ``cryptography`` with a pinned serial and pinned
+  validity — two runs produce byte-identical files, and the bytes do not depend
+  on the OpenSSL version installed (see ``make_certificate``);
 * every RSA key comes from a deterministic SHA-256 counter stream, so a fresh
   clone reproduces the same key bytes without shipping a key;
 * PKCS#12 bytes are **not** reproducible (random salt and IV), so containers are
@@ -80,11 +81,6 @@ RSA_EXPONENT = 65537
 
 def iso(seconds: int) -> str:
     return datetime.fromtimestamp(seconds, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def openssl_stamp(seconds: int) -> str:
-    """``[CC]YYMMDDHHMMSSZ`` — the format ``ca -startdate`` / ``-enddate`` expect."""
-    return datetime.fromtimestamp(seconds, tz=timezone.utc).strftime("%Y%m%d%H%M%SZ")
 
 
 def parse_stamp(text: str) -> int:
@@ -224,7 +220,33 @@ def write_private_key(key, path: Path) -> None:
         pass
 
 
-# ── certificates via OpenSSL ────────────────────────────────────────────────
+# ── certificates ───────────────────────────────────────────────────────────
+
+
+def _der_length(length: int) -> bytes:
+    """DER length octets (definite form)."""
+    if length < 0x80:
+        return bytes([length])
+    body = length.to_bytes((length.bit_length() + 7) // 8, "big")
+    return bytes([0x80 | len(body)]) + body
+
+
+def _der(tag: int, body: bytes) -> bytes:
+    return bytes([tag]) + _der_length(len(body)) + body
+
+
+def _der_oid(dotted: str) -> bytes:
+    """Encode a dotted OID as DER (tag 0x06)."""
+    parts = [int(part) for part in dotted.split(".")]
+    body = bytearray([40 * parts[0] + parts[1]])
+    for part in parts[2:]:
+        chunk = [part & 0x7F]
+        part >>= 7
+        while part:
+            chunk.append((part & 0x7F) | 0x80)
+            part >>= 7
+        body.extend(reversed(chunk))
+    return _der(0x06, bytes(body))
 
 
 def make_certificate(
@@ -243,127 +265,138 @@ def make_certificate(
     """Sign a certificate with a pinned serial and pinned validity.
 
     ``issuer`` is ``(ca_cert, ca_key)`` for a CA-signed leaf, ``None`` for a
-    self-signed one. Both go through one signing path.
+    self-signed one.
 
-    **Why ``openssl ca`` and not ``openssl req``.** ``req -x509`` grew
-    ``-not_before`` / ``-not_after`` only in **OpenSSL 3.5**; the distro builds
-    the CI runners carry (3.0) reject them with ``req: Use -help for summary``,
-    so the earlier generator could only produce samples on one machine's OpenSSL.
-    ``ca`` has pinned dates through ``-startdate`` / ``-enddate`` since long
-    before 3.0, pins the serial through its database, and — unlike
-    ``cryptography`` 50, which refuses to *sign* with SHA-1 — still emits the
-    ``sha1WithRSAEncryption`` certificate the ``weak-sig`` sample exists to
-    describe. One path, both properties, every OpenSSL ≥ 3.0.
+    **Why not the ``openssl`` CLI.** Two separate failures made it unusable as
+    the fixture signer, both found by the first CI runs (G3):
 
-    The subject and extensions are passed through a **config file** rather than
-    ``-subj /CN=…``: on Windows, MSYS rewrites an argument that looks like a
-    ``/path`` into a native path, which turns ``/CN=x`` into ``D:/…/CN=x`` and
-    fails the request (observed locally and on the Windows runners).
+    1. ``req -x509`` grew ``-not_before`` / ``-not_after`` only in **OpenSSL
+       3.5**; the distro builds the runners carry (3.0) reject them with
+       ``req: Use -help for summary``, so samples could only be generated on one
+       machine's OpenSSL.
+    2. ``ca -startdate/-enddate`` works on 3.0, but its output **differs between
+       OpenSSL versions** even with every extension pinned: 3.0 and 3.5 produced
+       different DER for identical inputs, so the truth file's fingerprints
+       moved when the same repository was built on Linux and on Windows.
+
+    ``cryptography`` builds the TBS certificate itself, so the encoding is the
+    library's — identical on every platform — and an RSA PKCS#1 v1.5 signature
+    is deterministic. That makes "same inputs → same bytes" a property of this
+    file rather than of whichever ``openssl`` happens to be installed.
+
+    The one thing the builder will not do is *sign* with SHA-1 (``cryptography``
+    50 raises ``UnsupportedAlgorithm``), and the ``weak-sig`` sample exists to be
+    exactly that. So the TBS is taken from a SHA-256 build and re-signed at the
+    primitive level, where SHA-1 is still available; the final
+    ``Certificate ::= SEQUENCE { tbs, sigAlg, sigValue }`` is assembled here.
     """
-    # Signing material lives in a throwaway directory, never beside the artifact:
-    # a case directory must contain **exactly** the files the truth lists as
-    # inputs, and ``ca`` writes a config, a request, a serial and a database.
-    # Leaving those behind makes the tree disagree with the truth file — the
-    # failure the "declared inputs" test exists to catch.
-    with tempfile.TemporaryDirectory(prefix="certledger-sign-") as tmp:
-        work = Path(tmp)
-        database = work / "db"
-        database.mkdir(exist_ok=True)
-        (database / "index.txt").write_text("", encoding="utf-8")
-        # ``ca`` assigns the certificate the serial *currently in the file*, then
-        # increments it — so the file holds the wanted value, not value + 1.
-        (database / "serial").write_text(f"{serial:04X}\n", encoding="utf-8")
-        # ``ca`` refuses a second certificate with the same subject unless this
-        # is set; every case signs from a fresh database anyway.
-        (database / "index.txt.attr").write_text("unique_subject = no\n", encoding="utf-8")
+    import datetime as dt
 
-        extensions = [
-            f"basicConstraints = critical,CA:{'TRUE' if is_ca else 'FALSE'}",
-            # Declared as ``none`` on purpose. ``openssl ca`` fills in a
-            # Subject Key Identifier by default, and *which* defaults it fills
-            # in has changed between releases — so the same invocation produced
-            # a different DER on OpenSSL 3.0 (the CI runners) and 3.5 (this
-            # machine), which made the truth file irreproducible across
-            # platforms. Every extension the certificate carries is now named
-            # here; nothing is left to a version-dependent default.
-            "subjectKeyIdentifier = none",
-            "authorityKeyIdentifier = none",
-        ]
-        if is_ca:
-            extensions.append("keyUsage = critical,keyCertSign,cRLSign")
-        else:
-            extensions.append("keyUsage = critical,digitalSignature,keyEncipherment")
-            extensions.append("extendedKeyUsage = serverAuth")
-            if san:
-                extensions.append(f"subjectAltName = DNS:{san}")
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding
+    from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
-        config = work / "ca.cnf"
-        config.write_text(
-            "\n".join(
-                [
-                    "[ca]",
-                    "default_ca = CA_default",
-                    "[CA_default]",
-                    f"dir = {database.as_posix()}",
-                    f"database = {(database / 'index.txt').as_posix()}",
-                    f"serial = {(database / 'serial').as_posix()}",
-                    f"new_certs_dir = {database.as_posix()}",
-                    f"default_md = {digest}",
-                    "policy = policy_any",
-                    "x509_extensions = ext",
-                    "unique_subject = no",
-                    "[policy_any]",
-                    "commonName = supplied",
-                    "[req]",
-                    "distinguished_name = dn",
-                    "prompt = no",
-                    "[dn]",
-                    f"CN = {common_name}",
-                    "[ext]",
-                    *extensions,
-                ]
+    key = serialization.load_pem_private_key(key_path.read_bytes(), password=None)
+
+    if issuer is None:
+        signing_key = key
+        issuer_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
+    else:
+        issuer_cert_path, issuer_key_path = issuer
+        issuer_cert = x509.load_pem_x509_certificate(issuer_cert_path.read_bytes())
+        signing_key = serialization.load_pem_private_key(
+            issuer_key_path.read_bytes(), password=None
+        )
+        issuer_name = issuer_cert.subject
+
+    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
+    builder = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer_name)
+        .public_key(key.public_key())
+        .serial_number(serial)
+        .not_valid_before(dt.datetime.fromtimestamp(not_before, tz=dt.timezone.utc))
+        .not_valid_after(dt.datetime.fromtimestamp(not_after, tz=dt.timezone.utc))
+    )
+
+    # Every extension is named here, in a fixed order. Nothing is left to a
+    # library default: a default that changes between releases would change the
+    # DER, and with it every fingerprint in the truth file.
+    builder = builder.add_extension(
+        x509.BasicConstraints(ca=is_ca, path_length=None), critical=True
+    )
+    if is_ca:
+        builder = builder.add_extension(
+            x509.KeyUsage(
+                digital_signature=False,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=True,
+                crl_sign=True,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+    else:
+        builder = builder.add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=True,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        builder = builder.add_extension(
+            x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]), critical=False
+        )
+        if san:
+            builder = builder.add_extension(
+                x509.SubjectAlternativeName([x509.DNSName(san)]), critical=False
             )
-            + "\n",
-            encoding="utf-8",
-            newline="\n",
-        )
 
-        request = work / "request.csr"
-        run(
-            ["openssl", "req", "-new", "-key", str(key_path), "-config", str(config),
-             "-out", str(request)],
-            what=f"生成证书请求 {out_path.name}（CN={common_name}）",
-        )
+    if digest == "sha256":
+        certificate = builder.sign(signing_key, hashes.SHA256())
+        der = certificate.public_bytes(serialization.Encoding.DER)
+    elif digest == "sha1":
+        # ``builder.sign(..., SHA1())`` is refused, but the primitive still
+        # accepts it. The TBS also *names* its digest algorithm, so patching only
+        # the outer AlgorithmIdentifier would leave a certificate whose inner and
+        # outer algorithm disagree — readers take the inner one. Both OIDs are
+        # the same length (9 content bytes), so the swap is a byte replacement
+        # and no DER length has to be recomputed.
+        template = builder.sign(signing_key, hashes.SHA256())
+        tbs = template.tbs_certificate_bytes
+        sha256_oid = b"\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x01\x0b"
+        sha1_oid = b"\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x01\x05"
+        if tbs.count(sha256_oid) != 1:  # pragma: no cover - structural guard
+            raise GenerateError("TBS 里找不到唯一的 sha256WithRSA OID，无法改签 SHA-1")
+        tbs = tbs.replace(sha256_oid, sha1_oid)
+        signature = signing_key.sign(tbs, padding.PKCS1v15(), hashes.SHA1())
+        algorithm = _der(0x30, sha1_oid + b"\x05\x00")
+        der = _der(0x30, tbs + algorithm + _der(0x03, b"\x00" + signature))
+    else:  # pragma: no cover - guards a typo in CASES
+        raise GenerateError(f"未知摘要算法: {digest!r}")
 
-        argv = [
-            "openssl",
-            "ca",
-            "-config",
-            str(config),
-            "-in",
-            str(request),
-            "-startdate",
-            openssl_stamp(not_before),
-            "-enddate",
-            openssl_stamp(not_after),
-            "-batch",
-            # Without ``-notext`` ``ca`` prepends a human-readable dump of the
-            # certificate, and the file then starts with ``Certificate:`` rather
-            # than ``-----BEGIN CERTIFICATE-----``. The sniffer classifies by
-            # prefix, so every sample would be skipped as "unrecognised" — a
-            # whole fixture tree that looks generated and contains nothing the
-            # tool can read.
-            "-notext",
-            "-out",
-            str(out_path),
-        ]
-        if issuer is None:
-            argv += ["-selfsign", "-keyfile", str(key_path)]
-        else:
-            issuer_cert_path, issuer_key_path = issuer
-            argv += ["-cert", str(issuer_cert_path), "-keyfile", str(issuer_key_path)]
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        run(argv, what=f"签发 {out_path.name}（CN={common_name}）")
+    # Round-trip through the parser: a certificate the generator cannot read back
+    # is a sample that silently disappears from every scan.
+    x509.load_der_x509_certificate(der)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_bytes(
+        b"-----BEGIN CERTIFICATE-----\n"
+        + base64.encodebytes(der)
+        + b"-----END CERTIFICATE-----\n"
+    )
 
 
 # ── reading artifacts back (never guessing) ─────────────────────────────────
