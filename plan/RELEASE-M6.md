@@ -188,12 +188,27 @@ v/Scripts/python.exe -m pytest -q                      # 第二轮：生成样�
 
 | 事实 | 字面值 |
 |---|---|
-| tag 对象 OID | 见 `git rev-parse v0.1.1` |
-| tag 指向的 commit | 见 `git rev-parse v0.1.1^{commit}` |
-| tag 事件 CI run id | 见本仓库 Actions 页 `v0.1.1` 那次 run |
-| `certledger-0.1.1.tar.gz` sha256 | 见 Release 正文 |
-| Release 地址 | `https://github.com/yuluo554/10-21-certledger/releases/tag/v0.1.1`（`isDraft=false`、`isPrerelease=false`） |
-| sdist 两轮实测 | 见下方「复验记录」 |
+| tag 对象 OID | `e6c693c9a3270e96d45c38bceec3c1d6e5efffe7` |
+| tag 指向的 commit | `975223dbb9c3ba1e7dc8b6d2054a658c1a4b09ad`（`二次迭代 v0.1.1：修 cryptography 警告作用域…`） |
+| 推送 HEAD 的 CI run id | **`39928517923`** success，6 job 全绿（`Methodology gates` / `no-residue` / `Tests (py3.12,3.13) × (ubuntu,windows)`）；headSha = `975223d` |
+| **tag 事件 CI run id** | **`39929109405`** success，6 job 全绿；`headSha` = tag 指向的 `975223d`（本仓纪律：tag 自己的 CI 必须绿） |
+| `certledger-0.1.1.tar.gz` sha256 | `fdd233de504e4b35d8d313d4b3ec2e07691257fc03f36eff46f238d400cf0b8e`（307,713 bytes；本地构建 = GitHub digest = `gh release download` 重算，三者逐字符一致） |
+| Release 地址 | `https://github.com/yuluo554/10-21-certledger/releases/tag/v0.1.1`（`isDraft=false`、`isPrerelease=false`，附件 `certledger-0.1.1.tar.gz`） |
+| `v0.1.0` 未动 | `git rev-parse v0.1.0` 仍为 `77a61038153728a85826280f7b82ec3585b8a89a`（→ `37f80a6`）；`v0.1.0` Release 未编辑 |
+
+### 复验记录（sdist 两轮，2026-10-21）
+
+`sdist` 解包到中立目录 → 全新 venv 只装 `pytest` + 包本体：
+
+```text
+第一轮（无 fixtures/out）        → 254 passed / 109 skipped  exit 0
+bash fixtures/gen.sh（17 用例）  → 生成成功
+第二轮（生成样本后）            → 361 passed / 2 skipped    exit 0
+```
+
+与仓库内 `.venv` 的 `362 passed / 1 skipped` 的差值 = sdist 无 `.git`（`test_fixtures_truth.py`
+的 "not a git checkout" 合理 skip）+ 无 `fixtures/out` 时的样本 skip（第一轮 109 项）。
+`fixtures/expected.json` 在 sdist 内重生成后**字节未变**（`sha256 = 361a47e200bef568d24d499987c98ccfafbb2e3a7703701ff9661446a6d46b39`）。
 
 ### 覆盖对账（v0.1.1 · 三态，增量项）
 
