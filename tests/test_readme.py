@@ -42,11 +42,20 @@ def test_privacy_statement_is_on_the_first_screen() -> None:
 
 
 def test_status_line_carries_version_and_capability_only() -> None:
-    """Release state belongs to the Release page, not the packaged README (skill §C)."""
+    """Release state belongs to the Release page, not the packaged README (skill §C).
+
+    The version is read from the package's single source (``certledger.__version__``)
+    rather than pinned as a literal: the README status line is required to carry
+    whatever version ships, so a literal here would go stale on every release and
+    the assertion would have to be edited to keep up — a drift the test itself
+    should not introduce (``plan/05`` §三「版本号唯一来源」).
+    """
+    from certledger import __version__
+
     screen = first_screen()
     line = next((ln for ln in screen.split("\n") if ln.startswith("`Status:")), None)
     assert line is not None, "README must keep a Status line on the first screen"
-    assert "v0.1.0" in line
+    assert f"v{__version__}" in line
     assert "published" not in line.lower()
     assert "release" not in line.lower()
 

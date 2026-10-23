@@ -809,3 +809,103 @@ def test_summary_units_are_named_not_summed(policy) -> None:
     assert summary["cert_sources"] == sum(len(item["sources"]) for item in payload["certs"])
     assert summary["key_sources"] == sum(len(item["sources"]) for item in payload["keys"])
     assert summary["paired_keys"] <= summary["keys"]
+
+
+# ── ⑧ cryptography advisory warnings stay out of the record build ───────────
+
+
+def _zero_embedded_serial_certificate() -> bytes:
+    """DER for a certificate cryptography warns about *at extension access*.
+
+    The warning is raised lazily, the first time the YAML-free Rust parser walks
+    the TBS extensions — not when the DER is loaded. It fires because the
+    ``AuthorityKeyIdentifier`` embeds an ``authority_cert_serial_number`` of
+    zero, which is exactly the shape of the two real roots in this machine's
+    Windows store that produced the D1 symptom (``Go Daddy Class 2`` /
+    ``Starfield Class 2``). Building such a certificate through
+    ``CertificateBuilder`` is the only way to get the warning *without* a
+    machine-specific store: passing ``serial=0`` to the builder is not an option
+    — cryptography 50.0.2 raises ``ValueError: The serial number should be
+    positive.`` before the certificate exists.
+    """
+    import datetime as dt
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "zero-embedded-serial")])
+    authority = x509.AuthorityKeyIdentifier(
+        key_identifier=x509.SubjectKeyIdentifier.from_public_key(key.public_key()).digest,
+        authority_cert_issuer=[x509.DirectoryName(subject)],
+        authority_cert_serial_number=0,
+    )
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(0x1234)  # the certificate's own serial is positive
+        .not_valid_before(dt.datetime(2020, 1, 1, tzinfo=dt.timezone.utc))
+        .not_valid_after(dt.datetime(2035, 1, 1, tzinfo=dt.timezone.utc))
+        .add_extension(authority, critical=False)
+        .sign(key, hashes.SHA256())
+    )
+    return certificate.public_bytes(serialization.Encoding.DER)
+
+
+def test_certificate_that_cryptography_warns_about_is_still_recorded(policy, tmp_path) -> None:
+    """D1: a certificate cryptography warns about must not print to stderr.
+
+    The warning names *this module's* absolute source path, and the project's
+    contract is a document free of host paths (K5); a reader running
+    ``--source auto`` on a real machine must see zero stderr bytes. The record
+    build itself must emit no ``CryptographyDeprecationWarning``, and the
+    certificate must still be recorded — so a fix that merely dropped the
+    certificate fails here too.
+    """
+    import warnings
+
+    from cryptography.utils import CryptographyDeprecationWarning
+
+    der = _zero_embedded_serial_certificate()
+    (tmp_path / "warned.der").write_bytes(der)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", CryptographyDeprecationWarning)
+        payload = build(
+            roots=[str(tmp_path)], files=[], source="none", follow_symlinks=False, policy=policy
+        )
+
+    leaked = [item for item in caught if issubclass(item.category, CryptographyDeprecationWarning)]
+    assert leaked == [], [str(item.message) for item in leaked]
+    record = cert_by_fingerprint(payload, der_sha256(der))
+    assert record["is_ca"] is False  # the extensions were read, not skipped
+
+
+def test_record_build_survives_the_warning_promoted_to_an_error(policy, tmp_path) -> None:
+    """D1 regression: the mute must cover the *whole* record build.
+
+    ``cryptography`` states the certificate "will cause an exception in a future
+    release". Promoting every ``CryptographyDeprecationWarning`` to an error
+    simulates that future release today: with the warning scoped only to
+    ``sniff._load_certificate``'s single load line — where, as measured, it
+    never fires — this raises; with the mute wrapped around the record build it
+    does not. Without this test the risk has no defence in the suite.
+    """
+    import warnings
+
+    from cryptography.utils import CryptographyDeprecationWarning
+
+    der = _zero_embedded_serial_certificate()
+    (tmp_path / "warned.der").write_bytes(der)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", CryptographyDeprecationWarning)
+        payload = build(
+            roots=[str(tmp_path)], files=[], source="none", follow_symlinks=False, policy=policy
+        )
+
+    assert len(payload["certs"]) == 1

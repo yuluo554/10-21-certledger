@@ -142,3 +142,67 @@ CI 的 Linux job 是它的验收——**先红后绿**，不是本机推断。
 | 13 | CI 矩阵（ubuntu / windows × 3.10 / 3.12 / 3.13） | 实现 | run `39540591781`（8 job 全绿）。**先红后绿**：前三次 run 暴露 6 类跨平台缺陷 + 真值随 OpenSSL 版本漂移，逐条修完后才绿（G3 关闭） |
 | 14 | Release 附手工源码包 + sha256 登记 | 实现 | `certledger-0.1.0.tar.gz` 已附，sha256 写在 Release 正文；取回复算一致（§二）。tag 树内仍是占位符（A 方案） |
 | 15 | 开源空白（`total_count` 软论据） | 不适用 | 软论据，检索式与窗口记入 `data/README` §1.3，可复算；不作为硬承诺 |
+
+---
+
+# v0.1.1 二次迭代（2026-10-21）
+
+> 口径同本文件开头：**tag 树版本不含任何字面值**。`v0.1.1` 的 tag 对象 / commit OID / 包哈希 /
+> CI run id 在 tag 树里一律写「见 `git rev-parse v0.1.1`」或「见下 §二」；
+> 真值只在 **tag 之后的追加提交**里补（本节 §二）。`v0.1.0` 的 tag 与 Release **原样保留**。
+
+## 一、tag 前事实（v0.1.1）
+
+| 事实 | 证据 | 复跑命令 |
+|---|---|---|
+| 版本单一来源 = `0.1.1` | `src/certledger/__init__.py::__version__`；`pyproject.toml` 走 `dynamic`，无第二处字面量 | `py -3.12 -c "import sys;sys.path.insert(0,'src');import certledger;print(certledger.__version__)"` |
+| **D1 关闭**（`cryptography` 警告作用域） | `inventory.build()` 在整条记录构建外只静音 `CryptographyDeprecationWarning`；本机 81 张系统证书含 2 张触发（`Go Daddy Class 2` / `Starfield Class 2`，其 `AuthorityKeyIdentifier` 内嵌 serial=0，警告在访问 `.extensions` 时才惰性发出） | ① `py -3.12 -X utf8 -m certledger inventory --roots fixtures/out --source auto --json <out> 2> <err>` → stderr **0 字节**；② `py -3.12 -W error -X utf8 -m certledger inventory --roots fixtures/out --source auto --json <out>` → exit 0 |
+| **D1 有回归防线** | `tests/test_inventory.py` 新增 2 例：记录仍成形 / 升格为 error 也不抛。**负控实测**：撤掉静音，两例全红 | `./.venv/Scripts/python.exe -m pytest -q -k "cryptography_warns_about or promoted_to_an_error"` |
+| **D2 关闭**（入口文档点名 `selftest-gates.py`） | `README.md` §Development 与 `AGENTS.md`「任何新对话的第一件事」各加一行；`LAYOUT.DOC_TOOLS` 未受影响，M8 变异 `hit=True` 仍成立 | `grep -c "selftest-gates" README.md AGENTS.md` → 各 ≥ 1；`py -3.12 -X utf8 tools/selftest-gates.py` → 14 组全红 exit 0 |
+| **D3 关闭**（floor 3.10→3.12，决策 D15） | `pyproject.toml` `requires-python = ">=3.12"`、classifiers 删 3.10/3.11；`ci.yml` 矩阵 `["3.12","3.13"]`（6→4 job）；`README.md:37` `≥ 3.12`；`plan/00`/`plan/05`/`AGENTS.md` 同步 | `grep -n requires-python pyproject.toml`；`grep -C2 "python:" .github/workflows/ci.yml`；`grep -n "≥ 3.12" README.md` |
+| 布局门全绿 | 16 份必备件 / 7 份文档 / 4 处状态副本一致 / 8 行缺口 / 31 行台账 | `py -3.12 -X utf8 tools/check-sprint-layout.py` |
+| 脱敏门 0 命中 | 扫 80 个文本文件（`update/` 已加入 `SKIP_DIRS` 并 `gitignore`） | `py -3.12 -X utf8 tools/check-desensitized.py` |
+| 门自身可跑红 | 基线全绿 + 10 组布局变异 + 4 组脱敏变异全部按预期变红 | `py -3.12 -X utf8 tools/selftest-gates.py` |
+| 测试全绿 | 362 passed / 1 skipped（360 → +2 D1 回归例；唯一 skip 是 Windows chmod 不构成访问控制） | `./.venv/Scripts/python.exe -m pytest -q` |
+| `fixtures/expected.json` 字节未变 | M1 承诺：二次迭代未触碰生成器与真值 | `git diff v0.1.0..v0.1.1 -- fixtures/expected.json`（应无输出） |
+| sdist 仍自足 | 新 tag 的 sdist 解包 → 全新 venv 只装 pytest + 包 → pytest exit 0；再跑 `bash fixtures/gen.sh` → pytest exit 0 | 见下「sdist 自足复验」 |
+| 发布形态 | GitHub Release 附 `certledger-0.1.1.tar.gz`（sdist），sha256 登记在 Release 正文 | `gh release view v0.1.1` |
+
+### sdist 自足复验（本仓强项，二次迭代后仍须成立）
+
+```bash
+TMP=$(mktemp -d); cd "$TMP"; tar xzf <下载的 certledger-0.1.1.tar.gz>; cd certledger-0.1.1
+py -3.12 -m venv v && v/Scripts/python.exe -m pip -q install pytest && v/Scripts/python.exe -m pip -q install .
+v/Scripts/python.exe -m pytest -q                      # 第一轮：无 samples，含 D1 回归例
+bash fixtures/gen.sh >/dev/null 2>&1
+v/Scripts/python.exe -m pytest -q                      # 第二轮：生成样本后
+```
+
+> **数字口径**：与仓库内 `362 passed / 1 skipped` 的差值 = sdist 无 `.git`（`test_fixtures_truth.py` 的
+> "not a git checkout" 合理 skip）+ 无 `fixtures/out` 时的样本用例 skip。**逐次实测值见 §二**。
+
+## 二、tag 后追加（v0.1.1）
+
+> 本节在 **tag `v0.1.1` 之后的追加提交**里填写字面值；tag 树版本为占位。
+> **以下字面值都不在 tag 树内**——tag 树里那一栏只有占位符。
+
+| 事实 | 字面值 |
+|---|---|
+| tag 对象 OID | 见 `git rev-parse v0.1.1` |
+| tag 指向的 commit | 见 `git rev-parse v0.1.1^{commit}` |
+| tag 事件 CI run id | 见本仓库 Actions 页 `v0.1.1` 那次 run |
+| `certledger-0.1.1.tar.gz` sha256 | 见 Release 正文 |
+| Release 地址 | `https://github.com/yuluo554/10-21-certledger/releases/tag/v0.1.1`（`isDraft=false`、`isPrerelease=false`） |
+| sdist 两轮实测 | 见下方「复验记录」 |
+
+### 覆盖对账（v0.1.1 · 三态，增量项）
+
+> 只列二次迭代**新增或状态变化**的覆盖项；其余 15 项沿用上文「覆盖对账（阶段 7）」，理由不因二次迭代改变。
+
+| # | 覆盖项 | 三态 | 依据 / 理由 |
+|---|---|---|---|
+| 16 | 真实系统库证书的库警告不污染 stderr（D1） | 实现 | `inventory.build()` 静音作用域覆盖整条记录构建；本机 `--source auto` stderr 0 字节（实测） |
+| 17 | D1 回归防线（`-W error` 下不抛） | 实现 | `tests/test_inventory.py` 2 例 + 负控实测（撤掉静音两例全红） |
+| 18 | 入口文档点名 `selftest-gates.py`（D2） | 实现 | `README.md` §Development、`AGENTS.md` 各一行；`grep -c` 各 ≥ 1 |
+| 19 | Python floor 3.12 / CI 矩阵 4 job（D3 / D15） | 实现 | `pyproject.toml` + `ci.yml` + 三处文档同步；`plan/00` D15 supersede D13 的 floor 一项 |
+| 20 | v0.1.0 的 tag 与 Release 原样保留 | 实现 | `git rev-parse v0.1.0` 不变；Release `v0.1.0` 未编辑 |

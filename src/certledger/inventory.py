@@ -33,12 +33,14 @@ from __future__ import annotations
 import json
 import os
 import stat
+import warnings
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Iterable
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
+from cryptography.utils import CryptographyDeprecationWarning
 from cryptography.x509.oid import ExtensionOID
 
 from certledger.collectors import PARSE_UNSUPPORTED, DecodedCandidate, collect_with_items
@@ -98,6 +100,43 @@ def read_ledger(path: str) -> dict:
 
 
 def build(
+    *,
+    roots: Iterable[str],
+    files: Iterable[str],
+    source: str,
+    follow_symlinks: bool | None,
+    policy,
+) -> dict:
+    """Build the ledger, muting ``cryptography``'s advisory warnings for the pass.
+
+    ``cryptography`` warns about certificates that violate RFC 5280 *lazily* —
+    when ``.extensions`` (or the serial) is first parsed, not when the DER is
+    loaded. Real trust stores carry such certificates (measured 2026-10-23: 2 of
+    81, ``Go Daddy Class 2`` and ``Starfield Class 2``, each with an
+    AuthorityKeyIdentifier whose embedded serial is zero). The warning is a
+    property of the *file*, not a defect in this tool, and it prints this
+    module's absolute source path to stderr — a leak in a tool whose contract is
+    a report free of host paths (K5). The library also states it will *raise* in
+    a future release, and these accesses sit outside any ``try``, so the mute
+    covers the whole record build rather than the single load line in
+    ``sniff._load_certificate`` — a scope where, as measured, the warning never
+    fires anyway.
+
+    Only ``CryptographyDeprecationWarning`` is silenced: a bare
+    ``simplefilter("ignore")`` would also swallow warnings raised by this
+    project's own code. The ``except x509.ExtensionNotFound`` guards inside the
+    record builder are left untouched — an absent extension is a normal path,
+    and widening them to ``except Exception`` would make "extension missing"
+    indistinguishable from "parse failed", which this project forbids
+    ("未知即显式").
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", CryptographyDeprecationWarning)
+        return _build(roots=roots, files=files, source=source,
+                      follow_symlinks=follow_symlinks, policy=policy)
+
+
+def _build(
     *,
     roots: Iterable[str],
     files: Iterable[str],

@@ -10,11 +10,11 @@
 | 项目 | CertLedger（本地密码学资产台账） |
 | 性质 | 不参赛项目题 · 发布 GitHub **公开仓库** · 署名 `yuluo554` |
 | 交付形态 | **纯本地 Python CLI**（唯一形态；零网络、零远程握手、零守护进程） |
-| 技术栈 | Python ≥ 3.10 · `cryptography` ≥ 42（解析底座）· `pytest`（dev）· 可选 JDK `keytool` |
+| 技术栈 | Python ≥ 3.12 · `cryptography` ≥ 42（解析底座）· `pytest`（dev）· 可选 JDK `keytool` |
 | 许可证 | MIT |
-| 版本 | v1 计划 · 2026-10-20 定稿；代码版本 `0.1.0`（`src/certledger/__init__.py` 单一来源，M6 定版） |
+| 版本 | v1 计划 · 2026-10-20 定稿；代码版本 `0.1.1`（`src/certledger/__init__.py` 单一来源，M6 定版，二次迭代升位） |
 | 检索/查证窗口 | **2026-10-19T18:35Z – 19:05Z**（星数、push 日期均为该窗口快照） |
-| 当前状态 | **M0–M6 全部完成**：骨架 → 采集器 → 台账 → 卫生规则 → 报告与容器 → 发布（v0.1.0）；两道门全绿 |
+| 当前状态 | **M0–M6 全部完成**：骨架 → 采集器 → 台账 → 卫生规则 → 报告与容器 → 发布；二次迭代发布 `v0.1.1`；两道门全绿 |
 
 ---
 
@@ -71,6 +71,7 @@
 | D12 | 品牌隔离：本项目文档**不提及本系列任何其他项目**；命名避开"扫描/监控/告警"词系，用"台账/盘点"词系 | 交叉引用会污染定位与检索，也会把项目误归入监控红海。 |
 | **D13** | 2026-10-20 | **解析底座 = `cryptography` ≥ 42（用户拍板）**；Python 下界 **3.10**；许可证 **MIT** | 三条是骨架级决策：解析底座决定依赖面与全部测试形态（`cryptography` 能直接拿 DER 原始字节做哈希，满足 K1，且无需自研 ASN.1）；3.10 在受众面与语法可用性之间取中；MIT 便于公司内部直接采用。被否方案与理由见 `plan/02` §三。 |
 | **D14** | 2026-10-20 | **不设"未实现"退出码**：骨架期未落地能力产可见记录（`SOURCE_UNAVAILABLE` / `PARSE_UNSUPPORTED`）或由 CLI 转退出码 2，**不引入临时码** | 临时退出码退役时要四处同步（常量/分派/文档/测试），漏一处就是"文档说 4、实际不是 4"的漂移。既然骨架期就能用"可见记录 + 退出码 2"表达同一语义，就不制造需要退役的幽灵语义（`plan/06` G1）。 |
+| **D15** | 2026-10-21 | **Python 下界 3.10 → 3.12（取代 D13 的"下界 3.10"一项；`cryptography` ≥ 42 与 MIT 两项不变）**；CI 矩阵 `{ubuntu,windows} × {3.12,3.13}`；classifiers 删 3.10/3.11 | D13 选 3.10 的出发点是"受众面与语法可用性取中"。但 Python 3.10 的 **EOL 是 2026-10-31**（二次迭代时仅剩 8 天），继续声明支持等于承诺一个即将不受支持的运行时。事实核对：`cryptography` 50.0.2 的 `requires_python` 是 `>=3.9`，抬到 3.12 **不被依赖卡住**；3.12 提供项目已用的全部语法。被否方案：抬到 3.11（2027-10 也 EOL，代价未省）、维持 3.10 仅加 EOL 注记（8 天后即成虚诺）。实施与验收见 `plan/RELEASE-M6.md` §「v0.1.1 二次迭代」。 |
 
 ---
 
@@ -130,7 +131,7 @@
 | 容器视图 | `tests/test_containers.py` | M5 | `pytest -q tests/test_containers.py` |
 | 计划文档套件 | `plan/00..06` | M0 | `py tools/check-sprint-layout.py` |
 | 方法论装订 | `AGENTS.md` + `tools/check-sprint-layout.py` + `tools/check-desensitized.py` | M0 | `py tools/selftest-gates.py` |
-| 发布三件套 | tag `v0.1.0` + Release 附产物 + `plan/RELEASE-M6.md` | M6 | `git tag -l` / `git cat-file -e v0.1.0:plan/RELEASE-M6.md` |
+| 发布三件套 | tag `v0.1.0` + `v0.1.1` + Release 附产物 + `plan/RELEASE-M6.md`（含 v0.1.1 二次迭代节） | M6 | `git tag -l` / `git cat-file -e v0.1.1:plan/RELEASE-M6.md` |
 | 隐私声明 | `README.md` 首屏 | M0 | `tests/test_readme.py::test_privacy_statement_is_on_the_first_screen` |
 
 ---
@@ -146,7 +147,8 @@
 | 零网络 | — | `tests/test_architecture.py::test_no_network_imports_anywhere` + 采集器模块级断言 `test_collectors_import_no_network_modules`（R9） | ✅ 已实测（M0/M2） |
 | 八类样本可一键重生成 + 真值可独立复算 | `plan/04` §1.1 / §二；OpenSSL 3.5.6 实测 `-not_before`/`-not_after`/`-set_serial` | `fixtures/gen.sh` + `fixtures/gen.py` + `fixtures/expected.json`；`tests/test_fixtures_truth.py`（39 例）；`gen.sh --determinism` 29 个文件字节全等 | ✅ 已实测（M1） |
 | 八类格式嗅探 + 多块 PEM 展开 + 遍历稳定 + 五种 SKIP | `plan/03` §①；RFC 7468；JKS/JCEKS 魔数本机实测（JDK 26） | `parsing/sniff.py` + `collectors/walker.py`；`tests/test_collectors.py`（52 例，含 `bundle` offset 0/1/2 与真值逐条对账）+ `tests/test_parsing.py`（31 例） | ✅ 已实测（M2） |
-| 证书/私钥/容器/系统库同表交叉引用 | 自建实现（无同类先例，见 `plan/01` §1.4） | `inventory.build()` 产出单一 `certs[]`/`keys[]`，`sources[].kind ∈ {file,container,store}`；`tests/test_inventory.py`（27 例，含"三处来源合并为一条"与"PEM/DER 同证书合一"） | ✅ 已实测（M3） |
+| 证书/私钥/容器/系统库同表交叉引用 | 自建实现（无同类先例，见 `plan/01` §1.4） | `inventory.build()` 产出单一 `certs[]`/`keys[]`，`sources[].kind ∈ {file,container,store}`；`tests/test_inventory.py`（29 例，含"三处来源合并为一条"与"PEM/DER 同证书合一"） | ✅ 已实测（M3 / 2026-10-21 补 D1 回归 2 例） |
+| 真实系统库证书的库警告不污染 stderr（D1） | `cryptography` 的 `CryptographyDeprecationWarning`「未来版本会抛」；K5 报告不含主机路径 | `inventory.build()` 在整条记录构建外只静音 `CryptographyDeprecationWarning`；测 2 例钉住「记录仍成形」与「升格为 error 也不抛」（负控：撤掉静音两例全红） | ✅ 已实测（二次迭代 2026-10-21） |
 | 私钥↔证书按 SPKI 配对 | RFC 5280 §4.2.1.2 SKI / SPKI 结构 | `inventory._pair_certs` 只认 `spki_sha256`；`test_pair` / `test_same_cn` / `test_orphan` 三例钉住正反两面；配对键变异测试会变红 | ✅ 已实测（M3） |
 | 过期判定确定性（`--as-of`） | RFC 5280 §4.1.2.5；OpenSSL 3.5.6 实测 `verify -attime` 正确报 error 10 | `tests/test_asof.py`（7 例：同一 fixture 两个时刻结论不同、台账不随时刻移动）+ `tests/test_hygiene.py::test_not_after_equal_to_as_of_is_still_valid`（边界两侧）+ 17 用例逐条对账（13 条端到端一致，4 条见 `plan/05` §五）；判定本身不读 wall clock（`test_single_clock_source`） | ✅ 已实测（M4） |
 | 九类卫生规则 + 阈值/级别可配置 + 出处强制 | `plan/03` §③；`data/README.md` §五.2–§五.14 | `hygiene.evaluate`（九个 `_*_rules`）+ `tests/test_hygiene.py`（48 例）+ `tests/test_strength.py`（14 例）；9 组变异各打红对应用例（实测） | ✅ 已实测（M4） |

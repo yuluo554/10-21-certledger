@@ -28,6 +28,7 @@ SKIP_DIRS = {
     "dist-release",
     "node_modules",
     "fixtures/out",
+    "update",
 }
 SKIP_EXTS = {
     ".png",

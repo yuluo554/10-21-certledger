@@ -12,7 +12,7 @@ you have, which key pairs with which, and which nobody owns is the one that is s
 > talks to a remote service, and never writes a host name or a user name into a report. Real
 > certificates and private keys never enter this repository.
 
-`Status: v0.1.0 — collect, inventory, hygiene, report and containers all landed`
+`Status: v0.1.1 — collect, inventory, hygiene, report and containers all landed`
 
 ---
 
@@ -34,7 +34,7 @@ python -m venv .venv
 certledger --version
 ```
 
-Requires Python ≥ 3.10 and `cryptography` (installed automatically). `keytool` from a JDK is
+Requires Python ≥ 3.12 and `cryptography` (installed automatically). `keytool` from a JDK is
 **optional**: without it the container view degrades to a `CONTAINER_UNREADABLE` record instead of
 failing.
 
@@ -125,10 +125,13 @@ Non-JDK container formats (BKS, UBER) are likewise unverified and degrade to a
 ```bash
 py -3.12 tools/check-sprint-layout.py     # methodology layout gate
 py -3.12 tools/check-desensitized.py      # no host paths / usernames / proxy ports
+py -3.12 tools/selftest-gates.py          # 14 mutations: both gates must turn red
 py -3.12 -m pytest -q
 ```
 
 `AGENTS.md` is the entry point for any new session: **run the layout gate first**.
+`selftest-gates.py` is the evidence that the other two gates can still fail — it copies the
+repository, breaks one thing per case, and asserts the matching check goes red.
 
 ---
 
